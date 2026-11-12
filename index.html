@@ -1,0 +1,2632 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Asesmen Sumatif Akhir Semester - SDN 011 Sangatta Selatan</title>
+  
+  <!-- PWA Manifest Inline (Data URI) -->
+  <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkFzZXNtZW4gU0FTIFNETiAwMTEgU2FuZ2F0dGEgU2VsYXRhbiIsCiAgInNob3J0X25hbWUiOiAiU0FTIDAxMSBTQU5TRUwiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBmMTcyYSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjE3MmEiCn0=" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Mammoth.js CDN untuk Import Word (.docx) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              navy: '#0F172A',
+              navyLight: '#1E293B',
+              gold: '#D97706',
+              goldHover: '#B45309',
+              goldLight: '#FEF3C7',
+              accent: '#2563EB'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+    .option-btn-touch {
+      min-height: 54px;
+      touch-action: manipulation;
+    }
+    .pb-safe {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+    #app-shell {
+      min-height: 100dvh;
+      width: 100%;
+    }
+
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+      body {
+        background: #fff !important;
+        color: #000 !important;
+        overflow: visible !important;
+      }
+      body * {
+        visibility: hidden;
+      }
+      #analysis-modal, #analysis-modal * {
+        visibility: visible;
+      }
+      #analysis-modal {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+      #analysis-modal > div {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+      }
+      #analysis-matrix-container {
+        width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+      }
+      #analysis-matrix-container table {
+        width: 100% !important;
+        table-layout: auto !important;
+        font-size: 8.5pt !important;
+        page-break-inside: auto;
+      }
+      #analysis-matrix-container tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+      #analysis-matrix-container th, 
+      #analysis-matrix-container td {
+        padding: 2px 3px !important;
+      }
+      #analysis-modal .no-print {
+        display: none !important;
+      }
+      #analysis-modal .bg-brand-navy {
+        background-color: #0F172A !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .print-exact {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .signature-block {
+        page-break-inside: avoid !important;
+        margin-top: 15px !important;
+      }
+    }
+  </style>
+</head>
+<body class="text-slate-800 bg-slate-100 antialiased selection:bg-amber-400 selection:text-slate-900">
+
+  <!-- ==================== CORE APPLICATION & FIREBASE MODULE ==================== -->
+  <script type="module">
+    const IS_PREVIEW = true; // Ubah menjadi false SAAT DEPLOY / PUBLISH agar terhubung murni ke Firebase
+
+    const firebaseConfig = {
+      apiKey: "API_KEY_ANDA",
+      authDomain: "PROJECT_ID.firebaseapp.com",
+      projectId: "PROJECT_ID",
+      storageBucket: "PROJECT_ID.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      signInAnonymously,
+      signInWithCustomToken,
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      doc, 
+      getDoc, 
+      setDoc, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      collection, 
+      getDocs 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'sas-sdn011-v1';
+        self.addEventListener('install', (e) => self.skipWaiting());
+        self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+        self.addEventListener('fetch', (e) => {
+          e.respondWith(fetch(e.request).catch(() => new Response('Offline Mode')));
+        });
+      `;
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl).catch(() => {});
+    }
+
+    window.SAS_APP = {
+      IS_PREVIEW,
+      app: null,
+      db: null,
+      auth: null,
+      appId: typeof __app_id !== 'undefined' ? __app_id : 'sdn011-sangatta-selatan',
+      currentUser: null,
+      userProfile: null,
+      activeExam: null,
+      examAnswers: {},
+      examDoubts: {},
+      examTimer: null,
+      timeLeft: 0,
+      currentQuestionIdx: 0,
+
+      classes: ['3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B'],
+      subjects: [
+        'Bahasa Indonesia', 'Matematika', 'IPAS', 'PJOK', 
+        'Pendidikan Pancasila', 'Bahasa Inggris', 'Pendidikan Agama', 'Seni Budaya'
+      ],
+
+      data: {
+        teachers: [],
+        students: [],
+        exams: [],
+        results: []
+      }
+    };
+
+    function loadPreviewDummyData() {
+      if (!IS_PREVIEW) return;
+      window.SAS_APP.data.teachers = [
+        { id: 't3a', username: 'guru3a', password: '123', name: 'Siti Aminah, S.Pd', class: '3A', role: 'guru' },
+        { id: 't4a', username: 'guru4a', password: '123', name: 'Dewi Sartika, S.Pd', class: '4A', role: 'guru' }
+      ];
+      window.SAS_APP.data.students = [
+        { id: 's1', name: 'Aditya Pratama', class: '3A' },
+        { id: 's2', name: 'Aisyah Putri', class: '3A' }
+      ];
+      window.SAS_APP.data.exams = [
+        {
+          id: 'ex-3a-mat',
+          title: 'Asesmen Akhir Semester Matematika 3A',
+          subject: 'Matematika',
+          targetClass: '3A',
+          duration: 30,
+          status: 'aktif',
+          createdBy: 'guru3a',
+          questions: [
+            {
+              id: 1,
+              question: 'Hasil dari 125 + 275 adalah...',
+              options: { A: '350', B: '375', C: '400', D: '425' },
+              answer: 'C'
+            },
+            {
+              id: 2,
+              question: 'Sebuah persegi memiliki panjang sisi 8 cm. Keliling persegi tersebut adalah...',
+              options: { A: '16 cm', B: '24 cm', C: '32 cm', D: '64 cm' },
+              answer: 'C'
+            }
+          ]
+        }
+      ];
+      window.SAS_APP.data.results = [
+        {
+          id: 'res-1',
+          examId: 'ex-3a-mat',
+          examTitle: 'Asesmen Akhir Semester Matematika 3A',
+          studentId: 's1',
+          studentName: 'Aditya Pratama',
+          studentClass: '3A',
+          subject: 'Matematika',
+          score: 100,
+          correctCount: 2,
+          totalQuestions: 2,
+          studentAnswers: { 0: 'C', 1: 'C' },
+          completedAt: '12/11/2026 09:30'
+        }
+      ];
+    }
+
+    function getPublicCollectionRef(colName) {
+      return collection(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName);
+    }
+
+    function getPublicDocRef(colName, docId) {
+      return doc(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName, docId);
+    }
+
+    async function initProductionFirebase() {
+      if (IS_PREVIEW) return;
+
+      const activeConfig = (typeof __firebase_config !== 'undefined') 
+        ? JSON.parse(__firebase_config) 
+        : firebaseConfig;
+
+      window.SAS_APP.app = initializeApp(activeConfig);
+      window.SAS_APP.db = getFirestore(window.SAS_APP.app);
+      window.SAS_APP.auth = getAuth(window.SAS_APP.app);
+
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(window.SAS_APP.auth, __initial_auth_token);
+        } else if (!window.SAS_APP.auth.currentUser) {
+          await signInAnonymously(window.SAS_APP.auth);
+        }
+      } catch (err) {
+        console.warn("Info Auth Awal:", err.message);
+      }
+
+      onAuthStateChanged(window.SAS_APP.auth, async (user) => {
+        if (user && !user.isAnonymous && user.email) {
+          window.SAS_APP.currentUser = {
+            id: user.uid,
+            username: user.email,
+            name: 'Panitia SAS (Admin)',
+            role: 'admin'
+          };
+          window.updateLoggedInUI();
+        }
+        await window.syncInitialPublicData();
+      });
+    }
+
+    window.syncInitialPublicData = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.auth.currentUser) return;
+      try {
+        const [rostersSnap, examsSnap] = await Promise.all([
+          getDocs(getPublicCollectionRef('rosters')),
+          getDocs(getPublicCollectionRef('exams'))
+        ]);
+
+        let allStudents = [];
+        rostersSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          if (Array.isArray(d.list)) {
+            d.list.forEach(stu => {
+              allStudents.push({ id: stu.id, name: stu.name, class: docSnap.id });
+            });
+          }
+        });
+        window.SAS_APP.data.students = allStudents;
+        window.SAS_APP.data.exams = examsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (window.SAS_APP.currentUser) {
+          await window.syncStaffData();
+        }
+        refreshCurrentActiveView();
+      } catch (err) {
+        console.error("Gagal sinkronisasi awal:", err);
+      }
+    };
+
+    window.syncStaffData = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
+      try {
+        const tasks = [getDocs(getPublicCollectionRef('results'))];
+        if (window.SAS_APP.currentUser.role === 'admin') {
+          tasks.push(getDocs(getPublicCollectionRef('teachers')));
+        }
+        const [resultsSnap, teachersSnap] = await Promise.all(tasks);
+        window.SAS_APP.data.results = resultsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (teachersSnap) {
+          window.SAS_APP.data.teachers = teachersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+      } catch (err) {
+        console.error("Gagal memuat data staf:", err);
+      }
+    };
+
+    function refreshCurrentActiveView() {
+      window.populateClassDropdowns();
+      const activeSection = document.querySelector('.view-section:not(.hidden)');
+      if (!activeSection) return;
+      const id = activeSection.id;
+      if (id === 'home-view') window.onStudentClassChange();
+      if (id === 'dashboard-view') window.renderDashboard();
+      if (id === 'rekap-view') window.renderRekapTable();
+      if (id === 'users-view') window.renderUsersManagement();
+    }
+
+    window.DB_SERVICE = {
+      async loginAdmin(email, password) {
+        if (IS_PREVIEW) {
+          if ((email === 'admin' || email === 'admin@sdn011.sch.id') && password === '123') {
+            return { id: 'admin-demo', username: 'admin', name: 'Panitia SAS (Admin)', role: 'admin' };
+          }
+          throw new Error('Email/Username atau Password Admin salah.');
+        } else {
+          const userCred = await signInWithEmailAndPassword(window.SAS_APP.auth, email, password);
+          return {
+            id: userCred.user.uid,
+            username: userCred.user.email,
+            name: 'Panitia SAS (Admin)',
+            role: 'admin'
+          };
+        }
+      },
+
+      async loginTeacher(username, password) {
+        if (IS_PREVIEW) {
+          const found = window.SAS_APP.data.teachers.find(
+            t => t.username.toLowerCase() === username.toLowerCase() && t.password === password
+          );
+          if (!found) throw new Error('Username atau Password Guru tidak cocok.');
+          return found;
+        } else {
+          if (!window.SAS_APP.auth.currentUser) {
+            await signInAnonymously(window.SAS_APP.auth);
+          }
+          const snap = await getDocs(getPublicCollectionRef('teachers'));
+          const teachersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const found = teachersList.find(
+            t => t.username && t.username.toLowerCase() === username.toLowerCase() && t.password === password
+          );
+          if (!found) throw new Error('Username atau Password Guru tidak terdaftar di database.');
+          return { ...found, role: 'guru' };
+        }
+      },
+
+      async logoutUser() {
+        if (!IS_PREVIEW && window.SAS_APP.auth) {
+          await signOut(window.SAS_APP.auth);
+          await signInAnonymously(window.SAS_APP.auth);
+        }
+      },
+
+      async addExam(examPayload) {
+        if (IS_PREVIEW) {
+          const newDoc = { id: 'ex-' + Date.now(), ...examPayload };
+          window.SAS_APP.data.exams.push(newDoc);
+          return newDoc;
+        } else {
+          const docRef = await addDoc(getPublicCollectionRef('exams'), examPayload);
+          const created = { id: docRef.id, ...examPayload };
+          window.SAS_APP.data.exams.push(created);
+          return created;
+        }
+      },
+
+      async toggleExamStatus(examId, newStatus) {
+        if (IS_PREVIEW) {
+          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+          if (ex) ex.status = newStatus;
+        } else {
+          await updateDoc(getPublicDocRef('exams', examId), { status: newStatus });
+          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+          if (ex) ex.status = newStatus;
+        }
+      },
+
+      async deleteExam(examId) {
+        if (IS_PREVIEW) {
+          window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
+        } else {
+          await deleteDoc(getPublicDocRef('exams', examId));
+          window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
+        }
+      },
+
+      async submitExamResult(resultPayload) {
+        if (IS_PREVIEW) {
+          const newRes = { id: 'res-' + Date.now(), ...resultPayload };
+          window.SAS_APP.data.results.push(newRes);
+          return newRes;
+        } else {
+          const uniqueResId = `${resultPayload.examId}_${resultPayload.studentId}`;
+          await setDoc(getPublicDocRef('results', uniqueResId), resultPayload);
+          const saved = { id: uniqueResId, ...resultPayload };
+          window.SAS_APP.data.results.push(saved);
+          return saved;
+        }
+      },
+
+      async checkStudentAlreadySubmitted(examId, studentId) {
+        if (IS_PREVIEW) {
+          return window.SAS_APP.data.results.some(r => r.examId === examId && r.studentId === studentId);
+        } else {
+          const snap = await getDoc(getPublicDocRef('results', `${examId}_${studentId}`));
+          return snap.exists();
+        }
+      },
+
+      async saveClassRoster(className, studentNamesArray) {
+        const cleanList = studentNamesArray
+          .map((name, idx) => ({
+            id: `stu_${className}_${Date.now()}_${idx}`,
+            name: name.trim()
+          }))
+          .filter(item => item.name.length > 0);
+
+        if (IS_PREVIEW) {
+          const existing = window.SAS_APP.data.students.filter(s => s.class === className);
+          const merged = [
+            ...existing,
+            ...cleanList.map(c => ({ id: c.id, name: c.name, class: className }))
+          ];
+          window.SAS_APP.data.students = [
+            ...window.SAS_APP.data.students.filter(s => s.class !== className),
+            ...merged
+          ];
+        } else {
+          const existing = window.SAS_APP.data.students
+            .filter(s => s.class === className)
+            .map(s => ({ id: s.id, name: s.name }));
+          const merged = [...existing, ...cleanList];
+          await setDoc(getPublicDocRef('rosters', className), {
+            class: className,
+            list: merged,
+            updatedAt: new Date().toISOString()
+          });
+          window.SAS_APP.data.students = [
+            ...window.SAS_APP.data.students.filter(s => s.class !== className),
+            ...merged.map(m => ({ id: m.id, name: m.name, class: className }))
+          ];
+        }
+      },
+
+      async deleteStudent(studentId, className) {
+        if (IS_PREVIEW) {
+          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.id !== studentId);
+        } else {
+          const remaining = window.SAS_APP.data.students
+            .filter(s => s.class === className && s.id !== studentId)
+            .map(s => ({ id: s.id, name: s.name }));
+          await setDoc(getPublicDocRef('rosters', className), {
+            class: className,
+            list: remaining,
+            updatedAt: new Date().toISOString()
+          });
+          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.id !== studentId);
+        }
+      },
+
+      async addTeacher(teacherPayload) {
+        if (IS_PREVIEW) {
+          const newTeacher = { id: 't-' + Date.now(), ...teacherPayload, role: 'guru' };
+          window.SAS_APP.data.teachers.push(newTeacher);
+          return newTeacher;
+        } else {
+          const docRef = await addDoc(getPublicCollectionRef('teachers'), { ...teacherPayload, role: 'guru' });
+          const created = { id: docRef.id, ...teacherPayload, role: 'guru' };
+          window.SAS_APP.data.teachers.push(created);
+          return created;
+        }
+      },
+
+      async deleteTeacher(teacherId) {
+        if (IS_PREVIEW) {
+          window.SAS_APP.data.teachers = window.SAS_APP.data.teachers.filter(t => t.id !== teacherId);
+        } else {
+          await deleteDoc(getPublicDocRef('teachers', teacherId));
+          window.SAS_APP.data.teachers = window.SAS_APP.data.teachers.filter(t => t.id !== teacherId);
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+
+      if (IS_PREVIEW) {
+        loadPreviewDummyData();
+      } else {
+        await initProductionFirebase();
+      }
+
+      window.populateClassDropdowns();
+      window.updateNavigationVisibility();
+      window.switchView('home-view');
+    });
+  </script>
+
+  <!-- ==================== APP SHELL FULLPAGE WRAPPER ==================== -->
+  <div id="app-shell" class="flex flex-col min-h-screen bg-slate-100 pb-24 md:pb-0 overflow-x-hidden">
+
+    <!-- HEADER INSTITUSI -->
+    <header class="bg-brand-navy text-white sticky top-0 z-40 shadow-md border-b border-slate-800">
+      <div class="max-w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+        
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" onclick="switchView('home-view')">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-brand-gold to-amber-300 flex items-center justify-center shadow text-brand-navy font-bold shrink-0 border border-amber-200">
+            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+          </div>
+          <div class="min-w-0">
+            <h1 class="font-extrabold text-xs sm:text-base tracking-tight text-white leading-tight truncate">SDN 011 SANGATTA SELATAN</h1>
+            <p class="text-[10px] sm:text-xs text-amber-400 font-semibold tracking-wide truncate">Asesmen Sumatif Akhir Semester</p>
+          </div>
+        </div>
+
+        <!-- User Info & Action Buttons -->
+        <div class="flex items-center space-x-2 shrink-0">
+          <div id="user-profile-badge" class="hidden sm:flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
+            <i data-lucide="user-check" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span id="badge-user-name" class="font-semibold text-slate-200 max-w-[140px] truncate">Guest</span>
+            <span id="badge-user-role" class="text-[9px] bg-brand-gold text-slate-950 px-1.5 py-0.5 rounded font-extrabold uppercase">Siswa</span>
+          </div>
+
+          <button id="btn-login-modal" onclick="openLoginModal()" class="flex items-center space-x-1.5 bg-brand-gold hover:bg-brand-goldHover active:scale-95 text-slate-950 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-extrabold transition shadow">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Portal Guru / Admin</span>
+            <span class="sm:hidden">Staf</span>
+          </button>
+
+          <button id="btn-logout" onclick="handleLogout()" class="hidden flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>Keluar</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- LAYOUT UTAMA: FIXED SIDEBAR (DESKTOP) + MAIN WORKSPACE -->
+    <div class="flex flex-1">
+      <!-- DESKTOP FIXED SIDEBAR (HANYA TAMPIL SAAT ADMIN / GURU LOGIN) -->
+      <aside id="desktop-sidebar" class="hidden w-64 bg-brand-navy text-slate-300 border-r border-slate-800 shrink-0 sticky top-[61px] h-[calc(100vh-61px)] p-4 flex-col justify-between">
+        <div class="space-y-1.5">
+          <p class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Menu Manajemen</p>
+          
+          <button onclick="switchView('home-view')" data-nav="home-view" class="desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-800 text-amber-400 transition">
+            <i data-lucide="home" class="w-4 h-4"></i>
+            <span>Beranda / Pratinjau Siswa</span>
+          </button>
+
+          <button onclick="switchView('dashboard-view')" data-nav="dashboard-view" class="staff-only-menu hidden desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800/70 hover:text-white transition">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span>Panel Dashboard</span>
+          </button>
+
+          <button onclick="switchView('import-view')" data-nav="import-view" class="staff-only-menu hidden desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800/70 hover:text-white transition">
+            <i data-lucide="file-up" class="w-4 h-4"></i>
+            <span>Import Soal (.docx)</span>
+          </button>
+
+          <button onclick="switchView('rekap-view')" data-nav="rekap-view" class="staff-only-menu hidden desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800/70 hover:text-white transition">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+            <span>Rekap Nilai & Analisis</span>
+          </button>
+
+          <!-- MENU KHUSUS ADMIN SAJA -->
+          <button onclick="switchView('users-view')" data-nav="users-view" class="admin-only-menu hidden desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800/70 hover:text-white transition">
+            <i data-lucide="shield" class="w-4 h-4 text-amber-400"></i>
+            <span>Kelola Guru & Roster (Admin)</span>
+          </button>
+        </div>
+
+        <div class="bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/80 text-[11px] space-y-1">
+          <p class="font-bold text-amber-400 flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Sistem Terpadu SAS
+          </p>
+          <p class="text-slate-400 leading-relaxed">SDN 011 Sangatta Selatan. Mendukung ratusan peserta serentak.</p>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT CONTAINER -->
+      <main class="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+        <!-- 1. LANDING VIEW / PORTAL SISWA (MOBILE-FIRST) -->
+        <section id="home-view" class="view-section space-y-4 sm:space-y-6">
+          <!-- Hero Banner Clean & Ringkas di HP -->
+          <div class="relative bg-gradient-to-br from-slate-900 via-brand-navy to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-lg overflow-hidden border border-slate-700">
+            <div class="hidden sm:block absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
+              <i data-lucide="file-text" class="w-64 h-64 sm:w-80 sm:h-80"></i>
+            </div>
+            <div class="relative z-10 max-w-2xl">
+              <span class="inline-block bg-brand-gold/20 text-brand-gold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold border border-brand-gold/30 mb-1.5 sm:mb-3">
+                Tahun Ajaran 2026/2027
+              </span>
+              <h2 class="text-lg sm:text-3xl font-extrabold tracking-tight mb-1 sm:mb-2">
+                Selamat Datang Peserta Didik
+              </h2>
+              <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                Pilih <span class="text-amber-400 font-bold">Kelas</span> dan <span class="text-amber-400 font-bold">Nama Anda</span> di bawah ini untuk memulai ujian secara langsung.
+              </p>
+            </div>
+          </div>
+
+          <!-- Form Pilihan Akses Siswa & Daftar Ujian -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <!-- Input Pemilihan Identitas -->
+            <div class="lg:col-span-1 glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
+              <h3 class="text-sm sm:text-lg font-bold text-slate-900 mb-3.5 flex items-center gap-2">
+                <i data-lucide="user-check" class="w-5 h-5 text-brand-gold"></i>
+                Identitas Peserta SAS
+              </h3>
+
+              <div class="space-y-3.5">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">1. Pilih Kelas</label>
+                  <select id="student-select-class" onchange="onStudentClassChange()" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl p-3.5 focus:ring-2 focus:ring-brand-gold focus:border-brand-gold font-semibold touch-manipulation">
+                    <option value="">-- Pilih Kelas --</option>
+                    <option value="3A">Kelas 3A</option>
+                    <option value="3B">Kelas 3B</option>
+                    <option value="4A">Kelas 4A</option>
+                    <option value="4B">Kelas 4B</option>
+                    <option value="5A">Kelas 5A</option>
+                    <option value="5B">Kelas 5B</option>
+                    <option value="6A">Kelas 6A</option>
+                    <option value="6B">Kelas 6B</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">2. Pilih Nama Siswa</label>
+                  <select id="student-select-name" onchange="if(this.value) loadAvailableExamsForStudent()" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl p-3.5 focus:ring-2 focus:ring-brand-gold focus:border-brand-gold font-semibold touch-manipulation" disabled>
+                    <option value="">-- Pilih Kelas Terlebih Dahulu --</option>
+                  </select>
+                </div>
+
+                <button onclick="loadAvailableExamsForStudent()" class="w-full bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl shadow transition flex items-center justify-center gap-2 touch-manipulation text-xs sm:text-sm">
+                  <i data-lucide="search" class="w-4 h-4 text-brand-gold"></i>
+                  Tampilkan Ujian Aktif
+                </button>
+              </div>
+            </div>
+
+            <!-- Daftar Ujian Aktif Tersedia -->
+            <div class="lg:col-span-2 glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 class="text-sm sm:text-lg font-bold text-slate-900 mb-3.5 flex items-center justify-between gap-2">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="book-open" class="w-5 h-5 text-brand-accent shrink-0"></i>
+                  <span>Asesmen Siap Dikerjakan</span>
+                </span>
+                <span id="active-exam-count" class="text-[11px] sm:text-xs bg-slate-200 text-slate-800 px-2.5 py-1 rounded-full font-bold shrink-0">0 Ujian</span>
+              </h3>
+
+              <div id="student-exam-list" class="space-y-3">
+                <div class="text-center py-8 sm:py-10 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300 p-4">
+                  <i data-lucide="clipboard-list" class="w-9 h-9 mx-auto mb-2 opacity-50"></i>
+                  <p class="text-xs sm:text-sm">Pilih <b>Kelas</b> dan <b>Nama Siswa</b> untuk melihat soal ujian Anda.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. MODE UJIAN SISWA (TOUCH OPTIMIZED & CLEAN MOBILE LAYOUT) -->
+        <section id="exam-mode-view" class="view-section hidden space-y-3.5 sm:space-y-4">
+          <!-- Sticky Header Bar Ujian -->
+          <div class="bg-brand-navy text-white p-3 sm:p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-slate-700 sticky top-[57px] sm:top-[65px] z-30">
+            <div class="w-full sm:w-auto text-left flex items-center justify-between sm:block">
+              <div class="min-w-0 pr-2">
+                <h2 id="exam-mode-title" class="text-xs sm:text-lg font-extrabold text-amber-400 truncate">Matematika - Kelas 3A</h2>
+                <p id="exam-mode-student" class="text-[11px] sm:text-xs text-slate-300 truncate">Peserta: Siswa</p>
+              </div>
+              <!-- Timer Ringkas di Pojok Kanan Atas saat di HP -->
+              <div class="sm:hidden flex items-center gap-1.5 bg-slate-900/95 px-2.5 py-1.5 rounded-xl border border-amber-500/40 shrink-0">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400 animate-pulse"></i>
+                <span id="exam-timer-display-mobile" class="font-mono text-xs font-extrabold text-white">00:00:00</span>
+              </div>
+            </div>
+            
+            <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2 pt-1.5 sm:pt-0 border-t border-slate-800 sm:border-none">
+              <!-- Timer Desktop -->
+              <div class="hidden sm:flex items-center gap-2 bg-slate-900/90 px-3 py-2 rounded-xl border border-amber-500/30">
+                <i data-lucide="clock" class="w-4 h-4 text-amber-400 animate-pulse"></i>
+                <div>
+                  <span class="text-[9px] text-slate-400 block uppercase tracking-wider font-semibold">Sisa Waktu</span>
+                  <span id="exam-timer-display" class="font-mono text-base font-extrabold text-white">00:00:00</span>
+                </div>
+              </div>
+
+              <!-- Quick Toggle Sheet Nomor Soal (Mobile Only) -->
+              <button onclick="toggleMobileQuestionGrid()" class="lg:hidden flex-1 sm:flex-none justify-center bg-slate-800 active:bg-slate-700 text-amber-400 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                <i data-lucide="grid" class="w-4 h-4"></i>
+                <span>Daftar Soal</span>
+              </button>
+
+              <button onclick="openConfirmModal('Kumpulkan Ujian?', 'Pastikan seluruh soal sudah diperiksa. Lembar jawaban yang sudah dikumpulkan tidak dapat diubah kembali.', () => submitExam())" class="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-extrabold px-4 py-2 sm:py-2.5 rounded-xl shadow flex items-center gap-1.5 transition">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                <span>Selesai</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Layout Ujian Mobile & Desktop Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+            <!-- Area Lembar Soal -->
+            <div class="lg:col-span-3 glass-card p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div class="flex justify-between items-center pb-3 mb-4 border-b border-slate-200">
+                <span class="text-xs font-extrabold bg-slate-900 text-amber-400 px-3 py-1.5 rounded-full">
+                  Soal <span id="current-question-num">1</span>
+                </span>
+                <label class="flex items-center space-x-2 text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 cursor-pointer touch-manipulation">
+                  <input type="checkbox" id="doubt-checkbox" onchange="toggleDoubtState()" class="rounded text-amber-600 focus:ring-amber-500 w-4 h-4">
+                  <span>Ragu-ragu</span>
+                </label>
+              </div>
+
+              <!-- Pertanyaan & Opsi Jawaban -->
+              <div id="question-container" class="space-y-4 sm:space-y-6">
+                <div id="question-text" class="text-[15px] sm:text-lg font-semibold text-slate-800 leading-relaxed">
+                  <!-- Text Soal Dimuat via JS -->
+                </div>
+
+                <div id="options-container" class="space-y-2.5 sm:space-y-3 pt-1">
+                  <!-- Opsi Jawaban Touch Friendly Dimuat via JS -->
+                </div>
+              </div>
+
+              <!-- Tombol Navigasi Soal Bottom -->
+              <div class="flex items-center justify-between pt-5 mt-6 border-t border-slate-200 gap-2.5">
+                <button id="btn-prev-question" onclick="navigateQuestion(-1)" class="w-1/2 sm:w-auto bg-slate-200 hover:bg-slate-300 active:scale-[0.98] disabled:opacity-40 text-slate-800 text-xs font-bold py-3.5 px-5 rounded-xl flex items-center justify-center gap-1.5 touch-manipulation transition">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i> Sebelumnya
+                </button>
+                <button id="btn-next-question" onclick="navigateQuestion(1)" class="w-1/2 sm:w-auto bg-brand-navy hover:bg-slate-800 active:scale-[0.98] disabled:opacity-40 text-white text-xs font-bold py-3.5 px-5 rounded-xl flex items-center justify-center gap-1.5 touch-manipulation transition">
+                  Berikutnya <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Sidebar Grid Nomor Soal (Desktop / Bottom Sheet Drawer di HP) -->
+            <div id="question-grid-sidebar" class="hidden lg:block fixed inset-0 z-50 lg:static lg:z-auto bg-slate-900/60 lg:bg-transparent backdrop-blur-xs lg:backdrop-blur-none flex items-end lg:block">
+              <div class="w-full bg-white lg:bg-white/95 rounded-t-3xl lg:rounded-2xl p-5 shadow-2xl lg:shadow-sm border border-slate-200 max-h-[80vh] lg:max-h-none flex flex-col">
+                <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 lg:hidden"></div>
+                <div class="flex justify-between items-center mb-3">
+                  <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Pilih Nomor Soal</h4>
+                  <button onclick="toggleMobileQuestionGrid()" class="lg:hidden text-slate-500 hover:text-slate-800 bg-slate-100 p-1.5 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+
+                <div id="question-grid" class="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-2 overflow-y-auto p-1 custom-scrollbar">
+                  <!-- Dynamic Grid Buttons -->
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-3 lg:grid-cols-1 gap-2 text-[11px] text-slate-600 font-medium">
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-3 h-3 rounded bg-emerald-600 shrink-0"></div> Dijawab
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-3 h-3 rounded bg-amber-500 shrink-0"></div> Ragu
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-3 h-3 rounded bg-slate-200 border border-slate-300 shrink-0"></div> Kosong
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. DASHBOARD GURU & ADMIN -->
+        <section id="dashboard-view" class="view-section hidden space-y-4 sm:space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div>
+              <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">Panel Kelola Asesmen SAS</h2>
+              <p id="dashboard-welcome-msg" class="text-xs text-slate-500 mt-0.5">Selamat datang di portal manajemen SDN 011 Sangatta Selatan.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="handleRefreshStaffData()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-300 flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Segarkan Data
+              </button>
+              <button onclick="switchView('import-view')" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2">
+                <i data-lucide="file-up" class="w-4 h-4"></i> Import Word (.docx)
+              </button>
+              <button onclick="switchView('rekap-view')" class="flex-1 sm:flex-none bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-amber-400"></i> Rekap Nilai
+              </button>
+            </div>
+          </div>
+
+          <!-- Overview Cards Grid -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="glass-card p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3">
+              <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <i data-lucide="book-check" class="w-5 h-5"></i>
+              </div>
+              <div class="truncate">
+                <p class="text-[10px] sm:text-xs text-slate-500 font-semibold">Paket Ujian</p>
+                <h3 id="stat-total-exams" class="text-lg sm:text-2xl font-extrabold text-slate-900">0</h3>
+              </div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3">
+              <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <div class="truncate">
+                <p class="text-[10px] sm:text-xs text-slate-500 font-semibold">Siswa Terdaftar</p>
+                <h3 id="stat-total-students" class="text-lg sm:text-2xl font-extrabold text-slate-900">0</h3>
+              </div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3">
+              <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <i data-lucide="file-check" class="w-5 h-5"></i>
+              </div>
+              <div class="truncate">
+                <p class="text-[10px] sm:text-xs text-slate-500 font-semibold">Ujian Selesai</p>
+                <h3 id="stat-completed-results" class="text-lg sm:text-2xl font-extrabold text-slate-900">0</h3>
+              </div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3">
+              <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <i data-lucide="award" class="w-5 h-5"></i>
+              </div>
+              <div class="truncate">
+                <p class="text-[10px] sm:text-xs text-slate-500 font-semibold">Rata-Rata Nilai</p>
+                <h3 id="stat-avg-score" class="text-lg sm:text-2xl font-extrabold text-slate-900">0</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabel Daftar Ujian Terdaftar -->
+          <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="text-sm sm:text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <i data-lucide="list" class="w-4 h-4 text-brand-gold"></i>
+              Daftar Paket Asesmen Terdaftar
+            </h3>
+            <div class="overflow-x-auto -mx-4 sm:mx-0">
+              <table class="w-full text-left text-xs text-slate-700 min-w-[620px]">
+                <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
+                  <tr>
+                    <th class="py-3 px-4">Judul Asesmen</th>
+                    <th class="py-3 px-4">Mata Pelajaran</th>
+                    <th class="py-3 px-4">Kelas</th>
+                    <th class="py-3 px-4">Durasi</th>
+                    <th class="py-3 px-4">Jumlah Soal</th>
+                    <th class="py-3 px-4">Status</th>
+                    <th class="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-exams-tbody" class="divide-y divide-slate-100">
+                  <!-- JS Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. MANAJEMEN BANK SOAL & IMPORT DOCX -->
+        <section id="import-view" class="view-section hidden space-y-4 sm:space-y-6">
+          <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 mb-1">Unggah & Import Bank Soal dari Word (.docx)</h2>
+            <p class="text-xs text-slate-500 mb-5">Ekstraksi otomatis Teks Soal, Opsi Jawaban (A–D), dan Kunci Jawaban.</p>
+
+            <form id="form-create-exam" onsubmit="handleSaveExam(event)" class="space-y-5">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Judul Ujian</label>
+                  <input type="text" id="exam-input-title" placeholder="Contoh: SAS 1 Bahasa Indonesia 3A" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mata Pelajaran</label>
+                  <select id="exam-input-subject" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                    <!-- Injected via JS -->
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Kelas Target</label>
+                  <select id="exam-input-class" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                    <!-- Injected via JS -->
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Durasi (Menit)</label>
+                  <input type="number" id="exam-input-duration" value="60" min="5" max="180" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                </div>
+              </div>
+
+              <!-- Dropzone File Docx -->
+              <div class="border-2 border-dashed border-slate-300 hover:border-brand-gold rounded-2xl p-5 sm:p-7 text-center bg-slate-50/70 transition">
+                <i data-lucide="file-text" class="w-9 h-9 text-slate-400 mx-auto mb-2"></i>
+                <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx)</p>
+                <p class="text-[11px] text-slate-500 mb-3">Format penulisan berurutan: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
+                <input type="file" id="docx-file-input" accept=".docx" class="hidden" onchange="processDocxImport(this)">
+                <button type="button" onclick="document.getElementById('docx-file-input').click()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">
+                  Pilih File Docx
+                </button>
+                <span id="file-name-display" class="text-xs font-bold text-emerald-600 block mt-2"></span>
+              </div>
+
+              <!-- Preview Hasil Parse Soal -->
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+                  <span>Pratinjau Hasil Parsing Soal</span>
+                  <span id="parsed-questions-count" class="text-xs bg-slate-200 text-slate-800 px-2.5 py-0.5 rounded-full font-bold">0 Soal</span>
+                </h3>
+                
+                <div id="parsed-questions-list" class="space-y-3 max-h-80 overflow-y-auto custom-scrollbar p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div class="text-center py-6 text-xs text-slate-400">Belum ada file terunggah. Silakan pilih file Word di atas.</div>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button type="button" onclick="switchView('dashboard-view')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl">Batal</button>
+                <button type="submit" id="btn-save-exam" class="bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">Simpan Paket Ujian</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- 5. REKAPITULASI NILAI & ANALISIS BUTIR SOAL -->
+        <section id="rekap-view" class="view-section hidden space-y-4 sm:space-y-6">
+          <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+              <div>
+                <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">Rekapitulasi Hasil Asesmen SAS</h2>
+                <p class="text-xs text-slate-500">Nilai otomatis terhitung dan tersimpan dari lembar jawaban siswa.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openAnalysisModal()" class="bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2 transition">
+                  <i data-lucide="table-properties" class="w-4 h-4 text-amber-400"></i> Analisis Butir Soal
+                </button>
+                <button onclick="exportResultsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2 transition">
+                  <i data-lucide="download" class="w-4 h-4"></i> Ekspor Excel (.xls)
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Kelas & Mapel -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Filter Kelas</label>
+                <select id="rekap-filter-class" onchange="renderRekapTable()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-medium">
+                  <!-- Injected via JS -->
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Filter Mata Pelajaran</label>
+                <select id="rekap-filter-subject" onchange="renderRekapTable()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-medium">
+                  <!-- Injected via JS -->
+                </select>
+              </div>
+            </div>
+
+            <!-- Tabel Hasil Rekap -->
+            <div class="overflow-x-auto -mx-4 sm:mx-0">
+              <table class="w-full text-left text-xs text-slate-700 min-w-[580px]">
+                <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
+                  <tr>
+                    <th class="py-3 px-4">No</th>
+                    <th class="py-3 px-4">Nama Siswa</th>
+                    <th class="py-3 px-4">Kelas</th>
+                    <th class="py-3 px-4">Mata Pelajaran</th>
+                    <th class="py-3 px-4">Benar</th>
+                    <th class="py-3 px-4">Skor</th>
+                    <th class="py-3 px-4">Waktu Selesai</th>
+                  </tr>
+                </thead>
+                <tbody id="rekap-tbody" class="divide-y divide-slate-100">
+                  <!-- JS Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. MANAJEMEN GURU & ROSTER SISWA (KHUSUS ADMIN) -->
+        <section id="users-view" class="view-section hidden space-y-4 sm:space-y-6">
+          <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-1">
+              <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">Manajemen Guru Kelas & Roster Siswa</h2>
+              <span class="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase">Akses Khusus Admin</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-5">Kelola akun login Wali Kelas serta import massal daftar peserta didik (ratusan siswa) per rombel.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Kolom Kiri: Manajemen Guru Kelas -->
+              <div class="space-y-4">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="user-cog" class="w-4 h-4 text-brand-gold"></i> Akun Guru Kelas (3A – 6B)
+                </h3>
+
+                <form id="form-add-teacher" onsubmit="handleAddTeacher(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Nama Wali Kelas</label>
+                      <input type="text" id="add-teacher-name" required placeholder="Nama & Gelar..." class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Kelas Ampuan</label>
+                      <select id="add-teacher-class" required class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs"></select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Username Login</label>
+                      <input type="text" id="add-teacher-username" required placeholder="Contoh: guru3a" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Password Login</label>
+                      <input type="text" id="add-teacher-password" required placeholder="Password guru..." class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
+                    </div>
+                  </div>
+                  <button type="submit" class="w-full bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-lg shadow">
+                    Simpan Akun Guru Kelas
+                  </button>
+                </form>
+
+                <div class="border rounded-xl overflow-hidden border-slate-200 bg-white">
+                  <table class="w-full text-left text-xs text-slate-700">
+                    <thead class="bg-slate-100 uppercase text-[10px] font-bold">
+                      <tr>
+                        <th class="py-2.5 px-3">Kelas</th>
+                        <th class="py-2.5 px-3">Nama Guru</th>
+                        <th class="py-2.5 px-3">Username</th>
+                        <th class="py-2.5 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="teachers-tbody" class="divide-y divide-slate-100">
+                      <!-- JS Injected -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Kolom Kanan: Import Massal & Daftar Roster Siswa -->
+              <div class="space-y-4">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-brand-accent"></i> Roster Peserta Didik (Dukung Input Massal)
+                </h3>
+
+                <form onsubmit="handleAddBulkStudents(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Pilih Kelas Rombel</label>
+                    <select id="add-student-class" required onchange="renderUsersManagement()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-bold">
+                      <!-- JS Injected -->
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Daftar Nama Siswa (Satu nama per baris — bisa copy-paste dari Excel)</label>
+                    <textarea id="add-student-bulk-names" rows="4" required placeholder="Contoh:&#10;Aditya Pratama&#10;Aisyah Putri&#10;Budi Santoso" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs leading-relaxed"></textarea>
+                  </div>
+                  <button type="submit" id="btn-save-students" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-lg shadow">
+                    + Simpan Daftar Siswa ke Kelas
+                  </button>
+                </form>
+
+                <div class="border rounded-xl overflow-hidden border-slate-200 bg-white max-h-72 overflow-y-auto custom-scrollbar">
+                  <table class="w-full text-left text-xs text-slate-700">
+                    <thead class="bg-slate-100 uppercase text-[10px] font-bold sticky top-0">
+                      <tr>
+                        <th class="py-2.5 px-3">No</th>
+                        <th class="py-2.5 px-3">Kelas</th>
+                        <th class="py-2.5 px-3">Nama Siswa</th>
+                        <th class="py-2.5 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="students-roster-tbody" class="divide-y divide-slate-100">
+                      <!-- JS Injected -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-brand-navy text-slate-400 text-xs py-4 mt-auto border-t border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 text-center space-y-1">
+        <p class="font-semibold text-slate-300">Asesmen Sumatif Akhir Semester &copy; 2026 SDN 011 Sangatta Selatan</p>
+        <p class="text-[10px] text-slate-500">Responsif di Layar HP, Tablet, Chromebook & Laptop</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ==================== MOBILE FLOATING BOTTOM NAVIGATION (HANYA TAMPIL SAAT STAF LOGIN) ==================== -->
+  <nav id="mobile-bottom-nav" class="hidden md:hidden fixed bottom-2.5 left-3 right-3 bg-brand-navy/95 backdrop-blur-md text-slate-300 rounded-2xl shadow-2xl z-40 border border-slate-700 px-2 py-2 pb-safe">
+    <div class="flex justify-around items-center text-[10px] font-semibold">
+      <button onclick="switchView('home-view')" data-nav="home-view" class="mobile-nav-item flex flex-col items-center gap-1 text-amber-400 px-2 py-1">
+        <i data-lucide="home" class="w-5 h-5"></i>
+        <span>Beranda</span>
+      </button>
+      <button onclick="switchView('dashboard-view')" data-nav="dashboard-view" class="staff-only-menu hidden mobile-nav-item flex flex-col items-center gap-1 hover:text-white px-2 py-1">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span>Panel</span>
+      </button>
+      <button onclick="switchView('import-view')" data-nav="import-view" class="staff-only-menu hidden mobile-nav-item flex flex-col items-center gap-1 hover:text-white px-2 py-1">
+        <i data-lucide="file-plus" class="w-5 h-5"></i>
+        <span>Soal</span>
+      </button>
+      <button onclick="switchView('rekap-view')" data-nav="rekap-view" class="staff-only-menu hidden mobile-nav-item flex flex-col items-center gap-1 hover:text-white px-2 py-1">
+        <i data-lucide="file-check-2" class="w-5 h-5"></i>
+        <span>Nilai</span>
+      </button>
+      <button onclick="switchView('users-view')" data-nav="users-view" class="admin-only-menu hidden mobile-nav-item flex flex-col items-center gap-1 hover:text-white px-2 py-1">
+        <i data-lucide="shield" class="w-5 h-5 text-amber-400"></i>
+        <span>Admin</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== MODAL PORTAL LOGIN (HYBRID AUTH) ==================== -->
+  <div id="login-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+      <button onclick="closeLoginModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center mb-5">
+        <div class="w-12 h-12 bg-slate-900 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-lg font-extrabold text-slate-900">Portal Guru & Panitia SAS</h3>
+        <p class="text-xs text-slate-500">Pilih peran akses untuk masuk ke sistem pengelolaan ujian</p>
+      </div>
+
+      <!-- Tab Pilihan Peran Login -->
+      <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl mb-4 border border-slate-200">
+        <button type="button" id="tab-role-guru" onclick="switchLoginRoleTab('guru')" class="py-2 rounded-lg text-xs font-extrabold bg-white text-slate-900 shadow-sm transition">
+          Guru Kelas
+        </button>
+        <button type="button" id="tab-role-admin" onclick="switchLoginRoleTab('admin')" class="py-2 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-800 transition">
+          Admin / Panitia
+        </button>
+      </div>
+
+      <form onsubmit="handlePortalLogin(event)" class="space-y-4">
+        <input type="hidden" id="login-role-type" value="guru">
+
+        <div>
+          <label id="login-label-identity" class="block text-xs font-bold text-slate-700 uppercase mb-1">Username Guru Kelas</label>
+          <input type="text" id="login-input-username" required placeholder="Contoh: guru3a" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Password</label>
+          <input type="password" id="login-input-password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+        </div>
+
+        <div id="login-error-msg" class="hidden text-rose-600 bg-rose-50 border border-rose-200 text-xs p-2.5 rounded-xl font-semibold"></div>
+
+        <button type="submit" id="btn-submit-login" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl shadow transition text-xs">
+          Masuk Portal SAS
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== CUSTOM NOTIFICATION & CONFIRMATION MODAL ==================== -->
+  <div id="custom-dialog-modal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center space-y-4">
+      <div id="dialog-icon-wrap" class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 id="dialog-title" class="text-base font-extrabold text-slate-900">Informasi</h3>
+        <p id="dialog-message" class="text-xs text-slate-600 mt-1.5 leading-relaxed whitespace-pre-line">Pesan notifikasi</p>
+      </div>
+      <div class="flex items-center justify-center gap-2.5 pt-2">
+        <button id="dialog-btn-cancel" onclick="closeCustomDialog()" class="hidden flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold py-2.5 px-4 rounded-xl transition">
+          Batal
+        </button>
+        <button id="dialog-btn-ok" onclick="closeCustomDialog()" class="flex-1 bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow transition">
+          Ya, Lanjutkan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL REKAP ANALISIS JAWABAN BUTIR SOAL ==================== -->
+  <div id="analysis-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6">
+    <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden relative">
+      <!-- Modal Header -->
+      <div class="p-4 sm:p-6 bg-brand-navy text-white flex items-center justify-between border-b border-slate-700 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+            <i data-lucide="table-properties" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-lg font-extrabold text-white">Analisis Butir Jawaban Siswa</h3>
+            <p class="text-[11px] sm:text-xs text-amber-400 font-medium">Matriks ketepatan jawaban per nomor soal seluruh siswa</p>
+          </div>
+        </div>
+        <button onclick="closeAnalysisModal()" class="no-print text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Controls & Filter Paket Ujian -->
+      <div class="no-print p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+        <div class="flex-1 max-w-md">
+          <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Pilih Paket Ujian SAS</label>
+          <select id="analysis-select-exam" onchange="renderAnalysisMatrix()" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-gold">
+            <!-- Injected via JS -->
+          </select>
+        </div>
+
+        <div id="analysis-summary-badge" class="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 font-medium">
+          <!-- Summary Stat Injected -->
+        </div>
+      </div>
+
+      <!-- Matrix Body Table -->
+      <div class="p-4 sm:p-6 overflow-auto custom-scrollbar flex-grow">
+        <div id="analysis-matrix-container" class="min-w-[650px]">
+          <!-- Table Matrix & Signature Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Legend & Footer -->
+      <div class="no-print p-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold shrink-0">
+        <div class="flex items-center gap-4 text-[11px]">
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold">A</span> Benar</span>
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-rose-500 text-white flex items-center justify-center text-[9px] font-bold">B</span> Salah</span>
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-slate-300 text-slate-600 flex items-center justify-center text-[9px]">-</span> Belum Ujian</span>
+        </div>
+        
+        <div class="flex items-center gap-2 ml-auto">
+          <button onclick="exportAnalysisToExcel()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Save As Excel
+          </button>
+          <button onclick="printAnalysisMatrix()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition">
+            <i data-lucide="printer" class="w-4 h-4"></i> Cetak / Save PDF
+          </button>
+          <button onclick="closeAnalysisModal()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LOGIKA UI & INTERAKSI ==================== -->
+  <script>
+    let parsedDocxQuestions = [];
+
+    window.showNotify = function(title, message, isError = false) {
+      const modal = document.getElementById('custom-dialog-modal');
+      const iconWrap = document.getElementById('dialog-icon-wrap');
+      if (isError) {
+        iconWrap.className = 'w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto';
+        iconWrap.innerHTML = '<i data-lucide="x-circle" class="w-6 h-6"></i>';
+      } else {
+        iconWrap.className = 'w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto';
+        iconWrap.innerHTML = '<i data-lucide="check-circle-2" class="w-6 h-6"></i>';
+      }
+
+      document.getElementById('dialog-title').innerText = title;
+      document.getElementById('dialog-message').innerText = message;
+      document.getElementById('dialog-btn-cancel').classList.add('hidden');
+
+      const okBtn = document.getElementById('dialog-btn-ok');
+      okBtn.onclick = () => closeCustomDialog();
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.openConfirmModal = function(title, message, onConfirmCallback) {
+      const modal = document.getElementById('custom-dialog-modal');
+      const iconWrap = document.getElementById('dialog-icon-wrap');
+      iconWrap.className = 'w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto';
+      iconWrap.innerHTML = '<i data-lucide="help-circle" class="w-6 h-6"></i>';
+
+      document.getElementById('dialog-title').innerText = title;
+      document.getElementById('dialog-message').innerText = message;
+      document.getElementById('dialog-btn-cancel').classList.remove('hidden');
+
+      const okBtn = document.getElementById('dialog-btn-ok');
+      okBtn.onclick = () => {
+        closeCustomDialog();
+        if (typeof onConfirmCallback === 'function') onConfirmCallback();
+      };
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.closeCustomDialog = function() {
+      document.getElementById('custom-dialog-modal').classList.add('hidden');
+    };
+
+    window.switchView = async function(viewId) {
+      const user = window.SAS_APP.currentUser;
+      const staffViews = ['dashboard-view', 'import-view', 'rekap-view'];
+      const adminOnlyViews = ['users-view'];
+
+      if (adminOnlyViews.includes(viewId)) {
+        if (!user || user.role !== 'admin') {
+          showNotify('Akses Ditolak', 'Menu Manajemen Guru & Roster Siswa hanya dapat diakses oleh Admin / Panitia SAS.', true);
+          return;
+        }
+      }
+
+      if (staffViews.includes(viewId) && !user) {
+        openLoginModal();
+        return;
+      }
+
+      document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+      const targetView = document.getElementById(viewId);
+      if (targetView) targetView.classList.remove('hidden');
+
+      document.querySelectorAll('.desktop-nav-item').forEach(btn => {
+        if (btn.dataset.nav === viewId) {
+          btn.className = 'desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-800 text-amber-400 transition';
+        } else {
+          btn.className = 'desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800/70 hover:text-white transition';
+        }
+      });
+
+      document.querySelectorAll('.mobile-nav-item').forEach(btn => {
+        if (btn.dataset.nav === viewId) {
+          btn.classList.add('text-amber-400');
+        } else {
+          btn.classList.remove('text-amber-400');
+        }
+      });
+
+      setTimeout(() => lucide.createIcons(), 50);
+
+      if (viewId === 'dashboard-view') {
+        await window.syncStaffData();
+        renderDashboard();
+      }
+      if (viewId === 'rekap-view') {
+        await window.syncStaffData();
+        renderRekapTable();
+      }
+      if (viewId === 'users-view') {
+        await window.syncStaffData();
+        renderUsersManagement();
+      }
+      if (viewId === 'import-view') populateExamFormDropdowns();
+    };
+
+    window.updateNavigationVisibility = function() {
+      const user = window.SAS_APP.currentUser;
+      const desktopSidebar = document.getElementById('desktop-sidebar');
+      const mobileBottomNav = document.getElementById('mobile-bottom-nav');
+      const staffMenus = document.querySelectorAll('.staff-only-menu');
+      const adminMenus = document.querySelectorAll('.admin-only-menu');
+
+      if (user) {
+        desktopSidebar?.classList.remove('hidden');
+        desktopSidebar?.classList.add('md:flex');
+        mobileBottomNav?.classList.remove('hidden');
+        staffMenus.forEach(el => el.classList.remove('hidden'));
+      } else {
+        desktopSidebar?.classList.add('hidden');
+        desktopSidebar?.classList.remove('md:flex');
+        mobileBottomNav?.classList.add('hidden');
+        staffMenus.forEach(el => el.classList.add('hidden'));
+      }
+
+      if (user && user.role === 'admin') {
+        adminMenus.forEach(el => el.classList.remove('hidden'));
+      } else {
+        adminMenus.forEach(el => el.classList.add('hidden'));
+      }
+    };
+
+    window.handleRefreshStaffData = async function() {
+      await window.syncInitialPublicData();
+      showNotify('Data Diperbarui', 'Seluruh data ujian, siswa, dan hasil nilai terbaru telah dimuat dari server.');
+    };
+
+    window.populateClassDropdowns = function() {
+      const classes = window.SAS_APP.classes;
+      const subjects = window.SAS_APP.subjects;
+      const user = window.SAS_APP.currentUser;
+
+      const rekapSubjectSelect = document.getElementById('rekap-filter-subject');
+      if (rekapSubjectSelect) {
+        const prevVal = rekapSubjectSelect.value;
+        rekapSubjectSelect.innerHTML = '<option value="all">Semua Mata Pelajaran</option>' +
+          subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (prevVal) rekapSubjectSelect.value = prevVal;
+      }
+
+      const rekapClassSelect = document.getElementById('rekap-filter-class');
+      if (rekapClassSelect) {
+        if (user && user.role === 'guru' && user.class) {
+          rekapClassSelect.innerHTML = `<option value="${user.class}">Kelas ${user.class}</option>`;
+          rekapClassSelect.value = user.class;
+          rekapClassSelect.disabled = true;
+        } else {
+          const prevCls = rekapClassSelect.value;
+          rekapClassSelect.disabled = false;
+          rekapClassSelect.innerHTML = '<option value="all">Semua Kelas</option>' +
+            classes.map(c => `<option value="${c}">Kelas ${c}</option>`).join('');
+          if (prevCls) rekapClassSelect.value = prevCls;
+        }
+      }
+
+      const addStudentClassSelect = document.getElementById('add-student-class');
+      if (addStudentClassSelect) {
+        addStudentClassSelect.innerHTML = classes.map(c => `<option value="${c}">Kelas ${c}</option>`).join('');
+      }
+
+      const addTeacherClassSelect = document.getElementById('add-teacher-class');
+      if (addTeacherClassSelect) {
+        addTeacherClassSelect.innerHTML = classes.map(c => `<option value="${c}">Kelas ${c}</option>`).join('');
+      }
+    };
+
+    window.populateExamFormDropdowns = function() {
+      const classes = window.SAS_APP.classes;
+      const subjects = window.SAS_APP.subjects;
+      const user = window.SAS_APP.currentUser;
+
+      const subSelect = document.getElementById('exam-input-subject');
+      if (subSelect) {
+        subSelect.innerHTML = subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+
+      const clsSelect = document.getElementById('exam-input-class');
+      if (clsSelect) {
+        if (user && user.role === 'guru' && user.class) {
+          clsSelect.innerHTML = `<option value="${user.class}">Kelas ${user.class}</option>`;
+          clsSelect.value = user.class;
+          clsSelect.disabled = true;
+        } else {
+          clsSelect.disabled = false;
+          clsSelect.innerHTML = classes.map(c => `<option value="${c}">Kelas ${c}</option>`).join('');
+        }
+      }
+    };
+
+    window.onStudentClassChange = function() {
+      const selectedClass = document.getElementById('student-select-class').value;
+      const nameSelect = document.getElementById('student-select-name');
+      
+      if (!selectedClass) {
+        nameSelect.disabled = true;
+        nameSelect.innerHTML = '<option value="">-- Pilih Kelas Terlebih Dahulu --</option>';
+        return;
+      }
+
+      const filteredStudents = window.SAS_APP.data.students.filter(s => s.class === selectedClass);
+      
+      nameSelect.disabled = false;
+      if (filteredStudents.length === 0) {
+        nameSelect.innerHTML = '<option value="">Belum ada siswa terdaftar di kelas ini</option>';
+      } else {
+        nameSelect.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>' +
+          filteredStudents.map(s => `<option value="${s.id}" data-name="${s.name}">${s.name}</option>`).join('');
+      }
+    };
+
+    window.loadAvailableExamsForStudent = async function() {
+      const selectedClass = document.getElementById('student-select-class').value;
+      const nameSelect = document.getElementById('student-select-name');
+      const selectedStudentId = nameSelect.value;
+      const selectedName = nameSelect.options[nameSelect.selectedIndex]?.dataset?.name || '';
+
+      if (!selectedClass || !selectedStudentId || !selectedName) {
+        showNotify('Identitas Belum Lengkap', 'Silakan pilih Kelas dan Nama Siswa terlebih dahulu.', true);
+        return;
+      }
+
+      const examListContainer = document.getElementById('student-exam-list');
+      examListContainer.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">Memeriksa daftar asesmen aktif...</div>`;
+
+      const exams = window.SAS_APP.data.exams.filter(e => e.targetClass === selectedClass && e.status === 'aktif');
+      document.getElementById('active-exam-count').innerText = `${exams.length} Ujian`;
+
+      if (exams.length === 0) {
+        examListContainer.innerHTML = `
+          <div class="text-center py-8 text-slate-400 bg-slate-50 rounded-xl border border-slate-200 p-4">
+            <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-amber-500"></i>
+            <p class="text-xs font-semibold">Belum ada asesmen aktif untuk Kelas ${selectedClass}.</p>
+          </div>`;
+      } else {
+        const cardsHtml = await Promise.all(exams.map(async (ex) => {
+          const alreadyDone = await window.DB_SERVICE.checkStudentAlreadySubmitted(ex.id, selectedStudentId);
+          return `
+            <div class="bg-white p-4 rounded-xl border border-slate-200 hover:border-brand-gold shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+              <div>
+                <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded">${ex.subject}</span>
+                <h4 class="font-bold text-slate-900 text-sm mt-1.5">${ex.title}</h4>
+                <p class="text-xs text-slate-500 mt-0.5">Durasi: ${ex.duration} Menit | Jumlah: ${ex.questions.length} Soal</p>
+              </div>
+              ${alreadyDone 
+                ? `<span class="bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4"></i> Sudah Dikerjakan</span>`
+                : `<button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation">
+                    <i data-lucide="play" class="w-4 h-4 text-amber-400"></i> Mulai Ujian
+                  </button>`
+              }
+            </div>
+          `;
+        }));
+        examListContainer.innerHTML = cardsHtml.join('');
+      }
+      lucide.createIcons();
+    };
+
+    window.startStudentExam = function(examId, studentId, studentName, studentClass) {
+      const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!exam || !exam.questions || exam.questions.length === 0) {
+        showNotify('Soal Tidak Tersedia', 'Paket soal ini belum memiliki daftar pertanyaan.', true);
+        return;
+      }
+
+      window.SAS_APP.activeExam = exam;
+      window.SAS_APP.userProfile = { id: studentId, name: studentName, class: studentClass, role: 'siswa' };
+      window.SAS_APP.examAnswers = {};
+      window.SAS_APP.examDoubts = {};
+      window.SAS_APP.currentQuestionIdx = 0;
+
+      document.getElementById('exam-mode-title').innerText = `${exam.subject} - Kelas ${studentClass}`;
+      document.getElementById('exam-mode-student').innerText = `Peserta: ${studentName}`;
+
+      startExamTimer(exam.duration * 60);
+
+      switchView('exam-mode-view');
+      renderCurrentQuestion();
+      renderQuestionGrid();
+    };
+
+    function startExamTimer(seconds) {
+      clearInterval(window.SAS_APP.examTimer);
+      window.SAS_APP.timeLeft = seconds;
+
+      updateTimerDisplay();
+      window.SAS_APP.examTimer = setInterval(() => {
+        window.SAS_APP.timeLeft--;
+        updateTimerDisplay();
+
+        if (window.SAS_APP.timeLeft <= 0) {
+          clearInterval(window.SAS_APP.examTimer);
+          submitExam(true);
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const t = Math.max(0, window.SAS_APP.timeLeft);
+      const hours = Math.floor(t / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((t % 3600) / 60).toString().padStart(2, '0');
+      const secs = (t % 60).toString().padStart(2, '0');
+      const formatted = `${hours}:${mins}:${secs}`;
+      const desktopEl = document.getElementById('exam-timer-display');
+      const mobileEl = document.getElementById('exam-timer-display-mobile');
+      if (desktopEl) desktopEl.innerText = formatted;
+      if (mobileEl) mobileEl.innerText = formatted;
+    }
+
+    function renderCurrentQuestion() {
+      const exam = window.SAS_APP.activeExam;
+      const idx = window.SAS_APP.currentQuestionIdx;
+      const question = exam.questions[idx];
+
+      document.getElementById('current-question-num').innerText = `${idx + 1} / ${exam.questions.length}`;
+      document.getElementById('question-text').innerHTML = `${idx + 1}. ${question.question}`;
+
+      const optionsContainer = document.getElementById('options-container');
+      const selectedAnswer = window.SAS_APP.examAnswers[idx];
+
+      optionsContainer.innerHTML = ['A', 'B', 'C', 'D'].map(key => {
+        const value = question.options[key] || '-';
+        const isChecked = selectedAnswer === key;
+        return `
+          <button type="button" onclick="selectOption('${key}')" class="w-full text-left option-btn-touch flex items-center space-x-3.5 p-3.5 rounded-xl border transition active:scale-[0.99] ${isChecked ? 'bg-amber-100 border-amber-500 font-bold ring-2 ring-amber-400' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}">
+            <span class="w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 ${isChecked ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">${key}</span>
+            <span class="text-sm sm:text-base text-slate-900 leading-snug">${value}</span>
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('doubt-checkbox').checked = !!window.SAS_APP.examDoubts[idx];
+      document.getElementById('btn-prev-question').disabled = idx === 0;
+      document.getElementById('btn-next-question').disabled = idx === exam.questions.length - 1;
+    }
+
+    window.selectOption = function(key) {
+      const idx = window.SAS_APP.currentQuestionIdx;
+      window.SAS_APP.examAnswers[idx] = key;
+      renderCurrentQuestion();
+      renderQuestionGrid();
+    };
+
+    window.toggleDoubtState = function() {
+      const idx = window.SAS_APP.currentQuestionIdx;
+      window.SAS_APP.examDoubts[idx] = document.getElementById('doubt-checkbox').checked;
+      renderQuestionGrid();
+    };
+
+    window.navigateQuestion = function(direction) {
+      const newIdx = window.SAS_APP.currentQuestionIdx + direction;
+      if (newIdx >= 0 && newIdx < window.SAS_APP.activeExam.questions.length) {
+        window.SAS_APP.currentQuestionIdx = newIdx;
+        renderCurrentQuestion();
+        renderQuestionGrid();
+      }
+    };
+
+    window.jumpToQuestion = function(idx) {
+      window.SAS_APP.currentQuestionIdx = idx;
+      renderCurrentQuestion();
+      renderQuestionGrid();
+      if (window.innerWidth < 1024) {
+        document.getElementById('question-grid-sidebar').classList.add('hidden');
+      }
+    };
+
+    window.toggleMobileQuestionGrid = function() {
+      document.getElementById('question-grid-sidebar').classList.toggle('hidden');
+    };
+
+    function renderQuestionGrid() {
+      const exam = window.SAS_APP.activeExam;
+      const gridContainer = document.getElementById('question-grid');
+
+      gridContainer.innerHTML = exam.questions.map((q, idx) => {
+        const isAnswered = window.SAS_APP.examAnswers[idx] !== undefined;
+        const isDoubt = window.SAS_APP.examDoubts[idx];
+        const isCurrent = window.SAS_APP.currentQuestionIdx === idx;
+
+        let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+        if (isDoubt) badgeClass = 'bg-amber-500 text-white font-bold';
+        else if (isAnswered) badgeClass = 'bg-emerald-600 text-white font-bold';
+
+        if (isCurrent) badgeClass += ' ring-2 ring-slate-900 ring-offset-1';
+
+        return `
+          <button onclick="jumpToQuestion(${idx})" class="w-9 h-9 rounded-lg text-xs flex items-center justify-center border transition ${badgeClass}">
+            ${idx + 1}
+          </button>
+        `;
+      }).join('');
+    }
+
+    window.submitExam = async function(isAutoTimeout = false) {
+      clearInterval(window.SAS_APP.examTimer);
+
+      const exam = window.SAS_APP.activeExam;
+      const answers = { ...window.SAS_APP.examAnswers };
+      let correctCount = 0;
+
+      exam.questions.forEach((q, idx) => {
+        if (answers[idx] === q.answer) {
+          correctCount++;
+        }
+      });
+
+      const score = Math.round((correctCount / exam.questions.length) * 100);
+
+      const resultObj = {
+        examId: exam.id,
+        examTitle: exam.title,
+        studentId: window.SAS_APP.userProfile.id,
+        studentName: window.SAS_APP.userProfile.name,
+        studentClass: window.SAS_APP.userProfile.class,
+        subject: exam.subject,
+        score: score,
+        correctCount: correctCount,
+        totalQuestions: exam.questions.length,
+        studentAnswers: answers,
+        completedAt: new Date().toLocaleString('id-ID')
+      };
+
+      try {
+        await window.DB_SERVICE.submitExamResult(resultObj);
+        const prefix = isAutoTimeout ? 'Waktu Habis! Jawaban otomatis dikirim.\n\n' : '';
+        showNotify(
+          'Ujian Selesai!',
+          `${prefix}Peserta: ${resultObj.studentName}\nNilai Akhir: ${score} / 100\nJawaban Benar: ${correctCount} dari ${exam.questions.length} soal.`
+        );
+        switchView('home-view');
+        loadAvailableExamsForStudent();
+      } catch (err) {
+        showNotify('Gagal Mengirim Jawaban', err.message, true);
+      }
+    };
+
+    window.processDocxImport = function(inputElement) {
+      const file = inputElement.files[0];
+      if (!file) return;
+
+      document.getElementById('file-name-display').innerText = `File terpilih: ${file.name}`;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+          .then(function(result) {
+            parseDocxContent(result.value);
+          })
+          .catch(function(err) {
+            showNotify('Gagal Membaca Dokumen', err.message, true);
+          });
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    function parseDocxContent(text) {
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      parsedDocxQuestions = [];
+      let currentQ = null;
+
+      lines.forEach(line => {
+        const qMatch = line.match(/^(\d+)[\.\)]\s*(.+)/);
+        const optMatch = line.match(/^([A-D])[\.\)]\s*(.+)/i);
+        const keyMatch = line.match(/^(kunci|jawaban|kunci jawaban)[\s:]*([A-D])/i);
+
+        if (qMatch) {
+          if (currentQ) parsedDocxQuestions.push(currentQ);
+          currentQ = {
+            id: parseInt(qMatch[1]),
+            question: qMatch[2],
+            options: {},
+            answer: 'A'
+          };
+        } else if (optMatch && currentQ) {
+          currentQ.options[optMatch[1].toUpperCase()] = optMatch[2];
+        } else if (keyMatch && currentQ) {
+          currentQ.answer = keyMatch[2].toUpperCase();
+        } else if (currentQ && !optMatch && !keyMatch) {
+          currentQ.question += ' ' + line;
+        }
+      });
+
+      if (currentQ) parsedDocxQuestions.push(currentQ);
+      renderParsedQuestionsPreview();
+    }
+
+    function renderParsedQuestionsPreview() {
+      const container = document.getElementById('parsed-questions-list');
+      document.getElementById('parsed-questions-count').innerText = `${parsedDocxQuestions.length} Soal`;
+
+      if (parsedDocxQuestions.length === 0) {
+        container.innerHTML = '<div class="text-center py-6 text-xs text-rose-500 font-semibold">Format soal tidak dikenali. Pastikan penomoran menggunakan format 1. Pertanyaan, A. Opsi, Kunci: A</div>';
+        return;
+      }
+
+      container.innerHTML = parsedDocxQuestions.map((q, idx) => `
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+          <p class="font-bold text-slate-900">${idx + 1}. ${q.question}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-slate-600 pl-2">
+            <span><b>A.</b> ${q.options.A || '-'}</span>
+            <span><b>B.</b> ${q.options.B || '-'}</span>
+            <span><b>C.</b> ${q.options.C || '-'}</span>
+            <span><b>D.</b> ${q.options.D || '-'}</span>
+          </div>
+          <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded">Kunci Jawaban: ${q.answer}</span>
+        </div>
+      `).join('');
+    }
+
+    window.handleSaveExam = async function(e) {
+      e.preventDefault();
+      const title = document.getElementById('exam-input-title').value.trim();
+      const subject = document.getElementById('exam-input-subject').value;
+      const targetClass = document.getElementById('exam-input-class').value;
+      const duration = parseInt(document.getElementById('exam-input-duration').value);
+
+      if (parsedDocxQuestions.length === 0) {
+        showNotify('Soal Kosong', 'Harap unggah file .docx yang berisi soal terlebih dahulu!', true);
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-exam');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      try {
+        await window.DB_SERVICE.addExam({
+          title,
+          subject,
+          targetClass,
+          duration,
+          status: 'aktif',
+          createdBy: window.SAS_APP.currentUser?.username || 'admin',
+          createdAt: new Date().toISOString(),
+          questions: parsedDocxQuestions
+        });
+
+        parsedDocxQuestions = [];
+        document.getElementById('form-create-exam').reset();
+        document.getElementById('file-name-display').innerText = '';
+        document.getElementById('parsed-questions-list').innerHTML = '<div class="text-center py-6 text-xs text-slate-400">Belum ada file terunggah.</div>';
+        document.getElementById('parsed-questions-count').innerText = '0 Soal';
+
+        showNotify('Berhasil Disimpan', `Paket ujian "${title}" untuk Kelas ${targetClass} berhasil diterbitkan.`);
+        switchView('dashboard-view');
+      } catch (err) {
+        showNotify('Gagal Menyimpan Ujian', err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Paket Ujian';
+      }
+    };
+
+    window.switchLoginRoleTab = function(role) {
+      document.getElementById('login-role-type').value = role;
+      const tabGuru = document.getElementById('tab-role-guru');
+      const tabAdmin = document.getElementById('tab-role-admin');
+      const labelId = document.getElementById('login-label-identity');
+      const inputId = document.getElementById('login-input-username');
+
+      if (role === 'guru') {
+        tabGuru.className = 'py-2 rounded-lg text-xs font-extrabold bg-white text-slate-900 shadow-sm transition';
+        tabAdmin.className = 'py-2 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-800 transition';
+        labelId.innerText = 'Username Guru Kelas';
+        inputId.type = 'text';
+        inputId.placeholder = 'Contoh: guru3a';
+      } else {
+        tabAdmin.className = 'py-2 rounded-lg text-xs font-extrabold bg-white text-slate-900 shadow-sm transition';
+        tabGuru.className = 'py-2 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-800 transition';
+        labelId.innerText = window.SAS_APP.IS_PREVIEW ? 'Username / Email Admin' : 'Email Admin Firebase';
+        inputId.type = window.SAS_APP.IS_PREVIEW ? 'text' : 'email';
+        inputId.placeholder = window.SAS_APP.IS_PREVIEW ? 'admin' : 'admin@sdn011.sch.id';
+      }
+    };
+
+    window.handlePortalLogin = async function(e) {
+      e.preventDefault();
+      const roleType = document.getElementById('login-role-type').value;
+      const userVal = document.getElementById('login-input-username').value.trim();
+      const passVal = document.getElementById('login-input-password').value.trim();
+      const errEl = document.getElementById('login-error-msg');
+      const btn = document.getElementById('btn-submit-login');
+
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerText = 'Memverifikasi...';
+
+      try {
+        let loggedUser = null;
+        if (roleType === 'admin') {
+          loggedUser = await window.DB_SERVICE.loginAdmin(userVal, passVal);
+        } else {
+          loggedUser = await window.DB_SERVICE.loginTeacher(userVal, passVal);
+        }
+
+        window.SAS_APP.currentUser = loggedUser;
+        updateLoggedInUI();
+        closeLoginModal();
+        switchView('dashboard-view');
+      } catch (err) {
+        errEl.innerText = err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Masuk Portal SAS';
+      }
+    };
+
+    window.updateLoggedInUI = function() {
+      const user = window.SAS_APP.currentUser;
+      if (!user) return;
+
+      document.getElementById('user-profile-badge').classList.remove('hidden');
+      document.getElementById('badge-user-name').innerText = user.name;
+      document.getElementById('badge-user-role').innerText = user.role.toUpperCase() + (user.class ? ` (${user.class})` : '');
+
+      document.getElementById('btn-login-modal').classList.add('hidden');
+      document.getElementById('btn-logout').classList.remove('hidden');
+
+      updateNavigationVisibility();
+      populateClassDropdowns();
+    };
+
+    window.handleLogout = async function() {
+      await window.DB_SERVICE.logoutUser();
+      window.SAS_APP.currentUser = null;
+      document.getElementById('user-profile-badge').classList.add('hidden');
+      document.getElementById('btn-login-modal').classList.remove('hidden');
+      document.getElementById('btn-logout').classList.add('hidden');
+      updateNavigationVisibility();
+      populateClassDropdowns();
+      switchView('home-view');
+    };
+
+    window.openLoginModal = function() {
+      document.getElementById('login-error-msg').classList.add('hidden');
+      document.getElementById('login-modal').classList.remove('hidden');
+    };
+
+    window.closeLoginModal = function() {
+      document.getElementById('login-modal').classList.add('hidden');
+    };
+
+    window.renderDashboard = function() {
+      const user = window.SAS_APP.currentUser;
+      let exams = window.SAS_APP.data.exams;
+      let students = window.SAS_APP.data.students;
+      let results = window.SAS_APP.data.results;
+
+      if (user && user.role === 'guru' && user.class) {
+        exams = exams.filter(e => e.targetClass === user.class);
+        students = students.filter(s => s.class === user.class);
+        results = results.filter(r => r.studentClass === user.class);
+        document.getElementById('dashboard-welcome-msg').innerText = `Portal Guru ${user.name} — Wali Kelas ${user.class}`;
+      } else {
+        document.getElementById('dashboard-welcome-msg').innerText = `Portal Panitia / Administrator SAS SDN 011 Sangatta Selatan`;
+      }
+
+      document.getElementById('stat-total-exams').innerText = exams.length;
+      document.getElementById('stat-total-students').innerText = students.length;
+      document.getElementById('stat-completed-results').innerText = results.length;
+
+      const avgScore = results.length > 0 
+        ? Math.round(results.reduce((acc, curr) => acc + curr.score, 0) / results.length) 
+        : 0;
+      document.getElementById('stat-avg-score').innerText = avgScore;
+
+      const tbody = document.getElementById('dashboard-exams-tbody');
+      if (exams.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada paket ujian terdaftar. Klik tombol "Import Word (.docx)" untuk menambahkan soal.</td></tr>`;
+      } else {
+        tbody.innerHTML = exams.map(ex => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-bold text-slate-900">${ex.title}</td>
+            <td class="py-3 px-4">${ex.subject}</td>
+            <td class="py-3 px-4"><span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded">Kelas ${ex.targetClass}</span></td>
+            <td class="py-3 px-4">${ex.duration} Mnt</td>
+            <td class="py-3 px-4">${ex.questions?.length || 0} Soal</td>
+            <td class="py-3 px-4">
+              <button onclick="handleToggleExamStatus('${ex.id}', '${ex.status}')" class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase transition ${ex.status === 'aktif' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}">
+                ${ex.status}
+              </button>
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${ex.title} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    };
+
+    window.handleToggleExamStatus = async function(id, currentStatus) {
+      const nextStatus = currentStatus === 'aktif' ? 'nonaktif' : 'aktif';
+      await window.DB_SERVICE.toggleExamStatus(id, nextStatus);
+      renderDashboard();
+    };
+
+    window.handleDeleteExam = async function(id) {
+      await window.DB_SERVICE.deleteExam(id);
+      renderDashboard();
+      showNotify('Terhapus', 'Paket ujian berhasil dihapus.');
+    };
+
+    window.renderRekapTable = function() {
+      const user = window.SAS_APP.currentUser;
+      const clsFilter = document.getElementById('rekap-filter-class').value;
+      const subFilter = document.getElementById('rekap-filter-subject').value;
+
+      let results = window.SAS_APP.data.results;
+
+      if (user && user.role === 'guru' && user.class) {
+        results = results.filter(r => r.studentClass === user.class);
+      } else if (clsFilter !== 'all') {
+        results = results.filter(r => r.studentClass === clsFilter);
+      }
+
+      if (subFilter !== 'all') results = results.filter(r => r.subject === subFilter);
+
+      const tbody = document.getElementById('rekap-tbody');
+      if (results.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada data hasil ujian untuk filter terpilih.</td></tr>`;
+      } else {
+        tbody.innerHTML = results.map((r, i) => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-bold">${i + 1}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">${r.studentName}</td>
+            <td class="py-3 px-4">Kelas ${r.studentClass}</td>
+            <td class="py-3 px-4">${r.subject}</td>
+            <td class="py-3 px-4 font-semibold text-emerald-700">${r.correctCount} / ${r.totalQuestions}</td>
+            <td class="py-3 px-4"><span class="bg-amber-100 text-amber-900 font-extrabold px-2.5 py-1 rounded-lg">${r.score}</span></td>
+            <td class="py-3 px-4 text-slate-500">${r.completedAt}</td>
+          </tr>
+        `).join('');
+      }
+    };
+
+    window.exportResultsToExcel = function() {
+      const user = window.SAS_APP.currentUser;
+      const clsFilter = document.getElementById('rekap-filter-class').value;
+      const subFilter = document.getElementById('rekap-filter-subject').value;
+
+      let results = window.SAS_APP.data.results;
+
+      if (user && user.role === 'guru' && user.class) {
+        results = results.filter(r => r.studentClass === user.class);
+      } else if (clsFilter !== 'all') {
+        results = results.filter(r => r.studentClass === clsFilter);
+      }
+
+      if (subFilter !== 'all') results = results.filter(r => r.subject === subFilter);
+
+      if (results.length === 0) {
+        showNotify('Data Kosong', 'Tidak ada data nilai yang siap diekspor untuk filter terpilih.', true);
+        return;
+      }
+
+      const labelKelas = (user && user.role === 'guru' && user.class) 
+        ? `Kelas ${user.class}` 
+        : (clsFilter === 'all' ? 'Semua Kelas' : `Kelas ${clsFilter}`);
+      const labelMapel = subFilter === 'all' ? 'Semua Mata Pelajaran' : subFilter;
+      const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      let excelHTML = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 11pt; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #000000; padding: 6px; }
+            td { border: 1px solid #CCCCCC; padding: 5px; vertical-align: middle; }
+            .title { font-size: 14pt; font-weight: bold; text-align: center; }
+            .subtitle { font-size: 11pt; font-weight: bold; text-align: center; }
+            .meta { font-size: 10pt; font-style: italic; }
+            .text-center { text-align: center; }
+            .text-left { text-align: left; }
+            .font-bold { font-weight: bold; }
+            .bg-highlight { background-color: #FEF3C7; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td colspan="7" class="title">SDN 011 SANGATTA SELATAN</td></tr>
+            <tr><td colspan="7" class="subtitle">REKAPITULASI HASIL ASESMEN SUMATIF AKHIR SEMESTER (SAS)</td></tr>
+            <tr><td colspan="7" class="meta">Filter: ${labelKelas} | Mata Pelajaran: ${labelMapel} | Tanggal Unduh: ${tanggalCetak}</td></tr>
+            <tr><td colspan="7"></td></tr>
+            <thead>
+              <tr>
+                <th>NO</th>
+                <th>NAMA SISWA</th>
+                <th>KELAS</th>
+                <th>MATA PELAJARAN</th>
+                <th>JUMLAH BENAR</th>
+                <th>SKOR AKHIR</th>
+                <th>WAKTU SELESAI</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      results.forEach((r, idx) => {
+        excelHTML += `
+          <tr>
+            <td class="text-center">${idx + 1}</td>
+            <td class="text-left font-bold">${r.studentName}</td>
+            <td class="text-center">Kelas ${r.studentClass}</td>
+            <td class="text-left">${r.subject}</td>
+            <td class="text-center">${r.correctCount} / ${r.totalQuestions}</td>
+            <td class="text-center bg-highlight">${r.score}</td>
+            <td class="text-center">${r.completedAt}</td>
+          </tr>
+        `;
+      });
+
+      excelHTML += `
+            </tbody>
+            <tfoot>
+              <tr><td colspan="7"></td></tr>
+              <tr>
+                <td colspan="4" class="text-left font-bold">Total Siswa Selesai Ujian: ${results.length} Siswa</td>
+                <td colspan="3" class="text-center">Sangatta Selatan, ${tanggalCetak}</td>
+              </tr>
+              <tr>
+                <td colspan="4"></td>
+                <td colspan="3" class="text-center font-bold">Panitia / Wali Kelas</td>
+              </tr>
+              <tr><td colspan="7" style="height: 40px;"></td></tr>
+              <tr>
+                <td colspan="4"></td>
+                <td colspan="3" class="text-center font-bold">( ............................................................ )</td>
+              </tr>
+            </tfoot>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff' + excelHTML], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Rekap_Nilai_SAS_${labelKelas.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    window.openAnalysisModal = function() {
+      const modal = document.getElementById('analysis-modal');
+      const selectExam = document.getElementById('analysis-select-exam');
+      const user = window.SAS_APP.currentUser;
+      let exams = window.SAS_APP.data.exams;
+
+      if (user && user.role === 'guru' && user.class) {
+        exams = exams.filter(e => e.targetClass === user.class);
+      }
+
+      if (exams.length === 0) {
+        showNotify('Paket Ujian Kosong', 'Belum ada paket ujian tersedia untuk dianalisis.', true);
+        return;
+      }
+
+      selectExam.innerHTML = exams.map(e => `
+        <option value="${e.id}">${e.title} (${e.subject} - Kelas ${e.targetClass})</option>
+      `).join('');
+
+      modal.classList.remove('hidden');
+      renderAnalysisMatrix();
+      lucide.createIcons();
+    };
+
+    window.closeAnalysisModal = function() {
+      document.getElementById('analysis-modal').classList.add('hidden');
+    };
+
+    window.printAnalysisMatrix = function() {
+      const examId = document.getElementById('analysis-select-exam').value;
+      const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
+      const matrixContent = document.getElementById('analysis-matrix-container').innerHTML;
+
+      if (!exam) return;
+
+      const printDocHTML = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+          <meta charset="UTF-8">
+          <title>Analisis Butir Soal - ${exam.subject} Kelas ${exam.targetClass}</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #0F172A;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .print-header {
+              text-align: center;
+              margin-bottom: 12px;
+              border-bottom: 2px solid #0F172A;
+              padding-bottom: 8px;
+            }
+            .print-header h2 { margin: 0; font-size: 14pt; text-transform: uppercase; }
+            .print-header p { margin: 3px 0; font-size: 10pt; }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 8.5pt;
+              margin-top: 8px;
+            }
+            th, td {
+              border: 1px solid #334155;
+              padding: 4px 5px;
+              text-align: center;
+            }
+            th {
+              background-color: #0F172A !important;
+              color: #FFFFFF !important;
+              font-weight: bold;
+            }
+            td:nth-child(2) { text-align: left; font-weight: bold; }
+            .bg-emerald-500 {
+              background-color: #10B981 !important;
+              color: #FFFFFF !important;
+              padding: 2px 5px;
+              border-radius: 4px;
+              font-weight: bold;
+              display: inline-block;
+            }
+            .bg-rose-500 {
+              background-color: #F43F5E !important;
+              color: #FFFFFF !important;
+              padding: 2px 5px;
+              border-radius: 4px;
+              font-weight: bold;
+              display: inline-block;
+            }
+            .bg-slate-200 {
+              background-color: #E2E8F0 !important;
+              color: #64748B !important;
+              padding: 2px 5px;
+              border-radius: 4px;
+              display: inline-block;
+            }
+            .bg-amber-100 {
+              background-color: #FEF3C7 !important;
+              color: #78350F !important;
+              padding: 2px 5px;
+              border-radius: 4px;
+              font-weight: bold;
+            }
+            .signature-block {
+              margin-top: 24px;
+              display: flex;
+              justify-content: flex-end;
+              page-break-inside: avoid;
+              font-size: 9.5pt;
+            }
+            .signature-block > div {
+              text-align: center;
+              width: 240px;
+            }
+            .signature-block p { margin: 3px 0; }
+            .signature-block .mb-14 { margin-bottom: 50px; }
+            .hidden { display: block !important; }
+          </style>
+        </head>
+        <body>
+          ${matrixContent}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 300);
+            };
+          <\/script>
+        </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '_blank', 'width=1100,height=750');
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(printDocHTML);
+        printWindow.document.close();
+      } else {
+        const blob = new Blob([printDocHTML], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Cetak_Analisis_SAS_${exam.subject}_Kelas_${exam.targetClass}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showNotify('File Siap Cetak Diunduh', 'Pop-up cetak diblokir oleh browser. File lembar cetak telah diunduh otomatis—silakan buka file tersebut lalu tekan Ctrl+P untuk Cetak / Save as PDF.');
+      }
+    };
+
+    window.exportAnalysisToExcel = function() {
+      const examId = document.getElementById('analysis-select-exam').value;
+      const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!exam) return;
+
+      const teacherObj = window.SAS_APP.data.teachers.find(t => t.class === exam.targetClass);
+      const teacherName = teacherObj ? teacherObj.name : '.......................................';
+      const targetStudents = window.SAS_APP.data.students.filter(s => s.class === exam.targetClass);
+      const examResults = window.SAS_APP.data.results.filter(r => r.examId === exam.id);
+      const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const totalCols = exam.questions.length + 3;
+
+      let excelHTML = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 10pt; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #000000; padding: 5px; }
+            td { border: 1px solid #94A3B8; padding: 4px; text-align: center; }
+            .left { text-align: left; font-weight: bold; }
+            .benar { background-color: #D1FAE5; color: #065F46; font-weight: bold; }
+            .salah { background-color: #FFE4E6; color: #9F1239; font-weight: bold; }
+            .kosong { background-color: #F1F5F9; color: #64748B; }
+            .skor { background-color: #FEF3C7; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td colspan="${totalCols}" style="font-size:13pt; font-weight:bold; border:none;">SDN 011 SANGATTA SELATAN</td></tr>
+            <tr><td colspan="${totalCols}" style="font-size:11pt; font-weight:bold; border:none;">ANALISIS BUTIR JAWABAN ASESMEN SUMATIF AKHIR SEMESTER (SAS)</td></tr>
+            <tr><td colspan="${totalCols}" style="font-size:9pt; border:none;">Mata Pelajaran: ${exam.subject} | Kelas: ${exam.targetClass} | Paket: ${exam.title}</td></tr>
+            <tr><td colspan="${totalCols}" style="border:none;"></td></tr>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Siswa</th>
+                <th>Skor</th>
+                ${exam.questions.map((q, i) => `<th>No.${i + 1}<br>(Kunci: ${q.answer})</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      targetStudents.forEach((student, idx) => {
+        const res = examResults.find(r => r.studentName === student.name);
+        excelHTML += `<tr><td>${idx + 1}</td><td class="left">${student.name}</td>`;
+        if (res) {
+          excelHTML += `<td class="skor">${res.score}</td>`;
+          exam.questions.forEach((q, qIdx) => {
+            const ans = (res.studentAnswers && res.studentAnswers[qIdx]) ? res.studentAnswers[qIdx] : '-';
+            const cls = ans === '-' ? 'kosong' : (ans === q.answer ? 'benar' : 'salah');
+            excelHTML += `<td class="${cls}">${ans}</td>`;
+          });
+        } else {
+          excelHTML += `<td class="kosong">Belum</td>${exam.questions.map(() => `<td class="kosong">-</td>`).join('')}`;
+        }
+        excelHTML += `</tr>`;
+      });
+
+      excelHTML += `
+            </tbody>
+            <tfoot>
+              <tr><td colspan="${totalCols}" style="border:none;"></td></tr>
+              <tr><td colspan="${Math.max(1, totalCols - 3)}" style="border:none;"></td><td colspan="3" style="border:none; text-align:center;">Sangatta Selatan, ${tanggalCetak}</td></tr>
+              <tr><td colspan="${Math.max(1, totalCols - 3)}" style="border:none;"></td><td colspan="3" style="border:none; text-align:center; font-weight:bold;">Wali Kelas ${exam.targetClass}</td></tr>
+              <tr><td colspan="${totalCols}" style="height:40px; border:none;"></td></tr>
+              <tr><td colspan="${Math.max(1, totalCols - 3)}" style="border:none;"></td><td colspan="3" style="border:none; text-align:center; font-weight:bold; text-decoration:underline;">${teacherName}</td></tr>
+            </tfoot>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff' + excelHTML], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Analisis_Butir_Soal_${exam.subject.replace(/\s+/g, '_')}_Kelas_${exam.targetClass}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    window.renderAnalysisMatrix = function() {
+      const examId = document.getElementById('analysis-select-exam').value;
+      const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
+      const container = document.getElementById('analysis-matrix-container');
+      const summaryBadge = document.getElementById('analysis-summary-badge');
+
+      if (!exam) {
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">Paket Ujian tidak ditemukan.</p>';
+        return;
+      }
+
+      const teacherObj = window.SAS_APP.data.teachers.find(t => t.class === exam.targetClass);
+      const teacherName = teacherObj ? teacherObj.name : '.......................................';
+
+      const targetStudents = window.SAS_APP.data.students.filter(s => s.class === exam.targetClass);
+      const examResults = window.SAS_APP.data.results.filter(r => r.examId === exam.id);
+
+      summaryBadge.innerHTML = `
+        <span>Total Siswa Rombel: <b>${targetStudents.length}</b></span> |
+        <span>Sudah Ujian: <b class="text-emerald-600">${examResults.length}</b></span>
+      `;
+
+      let tableHTML = `
+        <div class="mb-3 text-center hidden print:block">
+          <h2 class="font-extrabold text-sm sm:text-base text-slate-900 uppercase tracking-wide">SDN 011 SANGATTA SELATAN</h2>
+          <p class="text-xs font-bold text-slate-700">REKAPITULASI ANALISIS BUTIR JAWABAN ASESMEN SAS</p>
+          <p class="text-[11px] text-slate-600">Mata Pelajaran: <b>${exam.subject}</b> | Kelas: <b>${exam.targetClass}</b> | Judul: <b>${exam.title}</b></p>
+          <hr class="my-1.5 border-slate-400">
+        </div>
+
+        <table class="w-full text-left text-xs border-collapse border border-slate-300">
+          <thead>
+            <tr class="bg-brand-navy text-white text-[10px] print-exact">
+              <th class="p-1.5 border border-slate-700 w-8 text-center">No</th>
+              <th class="p-1.5 border border-slate-700 min-w-[140px]">Nama Siswa</th>
+              <th class="p-1.5 border border-slate-700 w-12 text-center">Skor</th>
+              ${exam.questions.map((q, idx) => `
+                <th class="p-1 border border-slate-700 text-center" title="Kunci: ${q.answer}">
+                  <div class="text-[9px]">No.${idx + 1}</div>
+                  <div class="text-[8px] text-amber-400 font-bold">(${q.answer})</div>
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 text-[11px]">
+      `;
+
+      if (targetStudents.length === 0) {
+        tableHTML += `<tr><td colspan="${exam.questions.length + 3}" class="text-center p-4 text-slate-400">Belum ada data siswa terdaftar pada kelas ini.</td></tr>`;
+      } else {
+        targetStudents.forEach((student, idx) => {
+          const studentResult = examResults.find(r => r.studentName === student.name);
+
+          tableHTML += `
+            <tr class="hover:bg-slate-50 font-medium">
+              <td class="p-1.5 border border-slate-200 text-center text-slate-500">${idx + 1}</td>
+              <td class="p-1.5 border border-slate-200 font-bold text-slate-900">${student.name}</td>
+          `;
+
+          if (studentResult) {
+            tableHTML += `
+              <td class="p-1 border border-slate-200 text-center">
+                <span class="bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded text-[10px] print-exact">${studentResult.score}</span>
+              </td>
+            `;
+
+            exam.questions.forEach((q, qIdx) => {
+              const savedAns = studentResult.studentAnswers ? studentResult.studentAnswers[qIdx] : null;
+              const ans = savedAns || '-';
+              const isCorrect = ans === q.answer;
+
+              tableHTML += `
+                <td class="p-0.5 border border-slate-200 text-center font-bold">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] print-exact ${ans === '-' ? 'bg-slate-200 text-slate-500' : (isCorrect ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white')}" title="Kunci: ${q.answer}, Dijawab: ${ans}">
+                    ${ans}
+                  </span>
+                </td>
+              `;
+            });
+          } else {
+            tableHTML += `
+              <td class="p-1 border border-slate-200 text-center text-slate-400 text-[9px]">Belum</td>
+              ${exam.questions.map(() => `
+                <td class="p-0.5 border border-slate-200 text-center">
+                  <span class="inline-block w-5 h-5 rounded bg-slate-200 text-slate-400 text-[9px] leading-5 print-exact">-</span>
+                </td>
+              `).join('')}
+            `;
+          }
+
+          tableHTML += `</tr>`;
+        });
+      }
+
+      tableHTML += `</tbody></table>`;
+
+      tableHTML += `
+        <div class="signature-block mt-6 flex justify-end text-xs text-slate-800 font-medium">
+          <div class="text-center w-60 pr-2">
+            <p>Sangatta Selatan, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p class="font-bold text-slate-900 mb-14">Wali Kelas ${exam.targetClass}</p>
+            <p class="font-extrabold text-slate-900 underline">${teacherName}</p>
+            <p class="text-[10px] text-slate-500">NIP. ........................................</p>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = tableHTML;
+    };
+
+    window.renderUsersManagement = function() {
+      const user = window.SAS_APP.currentUser;
+      if (!user || user.role !== 'admin') return;
+
+      const teachers = window.SAS_APP.data.teachers;
+      const tbodyTeachers = document.getElementById('teachers-tbody');
+
+      if (teachers.length === 0) {
+        tbodyTeachers.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">Belum ada akun guru kelas terdaftar.</td></tr>`;
+      } else {
+        tbodyTeachers.innerHTML = teachers.map(t => `
+          <tr>
+            <td class="py-2.5 px-3 font-bold text-slate-900">Kelas ${t.class}</td>
+            <td class="py-2.5 px-3">${t.name}</td>
+            <td class="py-2.5 px-3 font-mono text-slate-500">${t.username}</td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="openConfirmModal('Hapus Akun Guru?', 'Akun ${t.name} akan dihapus.', () => handleDeleteTeacher('${t.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const selectedFilterClass = document.getElementById('add-student-class')?.value || '3A';
+      const students = window.SAS_APP.data.students.filter(s => s.class === selectedFilterClass);
+
+      const tbodyStudents = document.getElementById('students-roster-tbody');
+      if (students.length === 0) {
+        tbodyStudents.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">Belum ada data siswa terdaftar di Kelas ${selectedFilterClass}.</td></tr>`;
+      } else {
+        tbodyStudents.innerHTML = students.map((s, i) => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-3 text-slate-500 font-semibold">${i + 1}</td>
+            <td class="py-2 px-3 font-bold text-slate-800">Kelas ${s.class}</td>
+            <td class="py-2 px-3 font-medium text-slate-900">${s.name}</td>
+            <td class="py-2 px-3 text-right">
+              <button onclick="openConfirmModal('Hapus Siswa?', 'Hapus ${s.name} dari daftar roster?', () => handleDeleteStudent('${s.id}', '${s.class}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    };
+
+    window.handleAddTeacher = async function(e) {
+      e.preventDefault();
+      if (window.SAS_APP.currentUser?.role !== 'admin') return;
+
+      const name = document.getElementById('add-teacher-name').value.trim();
+      const cls = document.getElementById('add-teacher-class').value;
+      const username = document.getElementById('add-teacher-username').value.trim();
+      const password = document.getElementById('add-teacher-password').value.trim();
+
+      try {
+        await window.DB_SERVICE.addTeacher({ name, class: cls, username, password });
+        document.getElementById('form-add-teacher').reset();
+        renderUsersManagement();
+        showNotify('Guru Ditambahkan', `Akun Wali Kelas ${cls} (${name}) berhasil dibuat.`);
+      } catch (err) {
+        showNotify('Gagal Menambah Guru', err.message, true);
+      }
+    };
+
+    window.handleDeleteTeacher = async function(id) {
+      if (window.SAS_APP.currentUser?.role !== 'admin') return;
+      await window.DB_SERVICE.deleteTeacher(id);
+      renderUsersManagement();
+    };
+
+    window.handleAddBulkStudents = async function(e) {
+      e.preventDefault();
+      if (window.SAS_APP.currentUser?.role !== 'admin') return;
+
+      const cls = document.getElementById('add-student-class').value;
+      const rawText = document.getElementById('add-student-bulk-names').value;
+      const namesList = rawText.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+
+      if (namesList.length === 0) {
+        showNotify('Daftar Kosong', 'Masukkan minimal 1 nama siswa.', true);
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-students');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan Roster...';
+
+      try {
+        await window.DB_SERVICE.saveClassRoster(cls, namesList);
+        document.getElementById('add-student-bulk-names').value = '';
+        renderUsersManagement();
+        showNotify('Roster Disimpan', `${namesList.length} siswa berhasil ditambahkan ke Kelas ${cls}.`);
+      } catch (err) {
+        showNotify('Gagal Menyimpan Roster', err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '+ Simpan Daftar Siswa ke Kelas';
+      }
+    };
+
+    window.handleDeleteStudent = async function(id, cls) {
+      if (window.SAS_APP.currentUser?.role !== 'admin') return;
+      await window.DB_SERVICE.deleteStudent(id, cls);
+      renderUsersManagement();
+    };
+  </script>
+</body>
+</html>

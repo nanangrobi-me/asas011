@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Asesmen Sumatif Akhir Semester - SDN 011 Sangatta Selatan</title>
   
+  <!-- Favicon & PWA Icon Inline SVG (Selalu Terbaca di GitHub & Netlify) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230F172A'/%3E%3Cpath d='M32 14L8 25l24 11 20-9.2V41h4V25L32 14zm-14 19.5v8.2c0 4.6 6.3 8.3 14 8.3s14-3.7 14-8.3v-8.2L32 40l-14-6.5z' fill='%23F59E0B'/%3E%3C/svg%3E" />
+
   <!-- PWA Manifest Inline (Data URI) -->
   <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkFzZXNtZW4gU0FTIFNETiAwMTEgU2FuZ2F0dGEgU2VsYXRhbiIsCiAgInNob3J0X25hbWUiOiAiU0FTIDAxMSBTQU5TRUwiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBmMTcyYSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjE3MmEiCn0=" />
 
@@ -158,10 +161,12 @@
 
   <!-- ==================== CORE APPLICATION & FIREBASE MODULE ==================== -->
   <script type="module">
-    const IS_PREVIEW = false; // Ubah menjadi false SAAT DEPLOY / PUBLISH agar terhubung murni ke Firebase
+    // PENTING: Ubah menjadi false saat dipasang di GitHub & Netlify
+    const IS_PREVIEW = false; 
 
+    // TEMPELKAN FIREBASE CONFIG MILIK ANDA DI BAWAH INI
     const firebaseConfig = {
-  apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
+     apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
   authDomain: "asas011.firebaseapp.com",
   projectId: "asas011",
   storageBucket: "asas011.firebasestorage.app",
@@ -192,7 +197,7 @@
 
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE_NAME = 'sas-sdn011-v1';
+        const CACHE_NAME = 'sas-sdn011-v3';
         self.addEventListener('install', (e) => self.skipWaiting());
         self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
         self.addEventListener('fetch', (e) => {
@@ -294,6 +299,17 @@
       return doc(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName, docId);
     }
 
+    async function ensureAuthenticatedSession() {
+      if (IS_PREVIEW || !window.SAS_APP.auth) return;
+      if (!window.SAS_APP.auth.currentUser) {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(window.SAS_APP.auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(window.SAS_APP.auth);
+        }
+      }
+    }
+
     async function initProductionFirebase() {
       if (IS_PREVIEW) return;
 
@@ -301,37 +317,76 @@
         ? JSON.parse(__firebase_config) 
         : firebaseConfig;
 
+      if (!activeConfig.apiKey || activeConfig.apiKey === "API_KEY_ANDA") {
+        console.error("Konfigurasi Firebase belum diisi!");
+        setTimeout(() => {
+          window.showNotify(
+            "Konfigurasi Firebase Belum Diisi",
+            "Silakan ganti placeholder firebaseConfig di dalam kode HTML dengan konfigurasi dari Firebase Console Anda.",
+            true
+          );
+        }, 500);
+        return;
+      }
+
       window.SAS_APP.app = initializeApp(activeConfig);
       window.SAS_APP.db = getFirestore(window.SAS_APP.app);
       window.SAS_APP.auth = getAuth(window.SAS_APP.app);
 
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(window.SAS_APP.auth, __initial_auth_token);
-        } else if (!window.SAS_APP.auth.currentUser) {
-          await signInAnonymously(window.SAS_APP.auth);
-        }
+        await ensureAuthenticatedSession();
       } catch (err) {
-        console.warn("Info Auth Awal:", err.message);
+        console.error("Gagal login anonim Firebase:", err);
+        window.showNotify(
+          "Autentikasi Anonymous Belum Aktif",
+          "Pastikan metode login 'Anonymous' dan 'Email/Password' sudah diaktifkan di Firebase Console > Authentication > Sign-in method.",
+          true
+        );
       }
 
       onAuthStateChanged(window.SAS_APP.auth, async (user) => {
-        if (user && !user.isAnonymous && user.email) {
-          window.SAS_APP.currentUser = {
-            id: user.uid,
-            username: user.email,
-            name: 'Panitia SAS (Admin)',
-            role: 'admin'
-          };
-          window.updateLoggedInUI();
+        if (user) {
+          if (!user.isAnonymous && user.email) {
+            window.SAS_APP.currentUser = {
+              id: user.uid,
+              username: user.email,
+              name: 'Panitia SAS (Admin)',
+              role: 'admin'
+            };
+            window.updateLoggedInUI();
+          }
+          await window.syncInitialPublicData();
         }
-        await window.syncInitialPublicData();
       });
     }
 
-    window.syncInitialPublicData = async function() {
-      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.auth.currentUser) return;
+    window.fetchClassRosterFromFirestore = async function(className) {
+      if (IS_PREVIEW || !window.SAS_APP.db || !className) return;
       try {
+        await ensureAuthenticatedSession();
+        const docSnap = await getDoc(getPublicDocRef('rosters', className));
+        if (docSnap.exists() && Array.isArray(docSnap.data().list)) {
+          const classStudents = docSnap.data().list.map(stu => ({
+            id: stu.id,
+            name: stu.name,
+            class: className
+          }));
+          window.SAS_APP.data.students = [
+            ...window.SAS_APP.data.students.filter(s => s.class !== className),
+            ...classStudents
+          ];
+        } else {
+          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.class !== className);
+        }
+      } catch (err) {
+        console.error(`Gagal mengambil roster kelas ${className}:`, err);
+      }
+    };
+
+    window.syncInitialPublicData = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db) return;
+      try {
+        await ensureAuthenticatedSession();
         const [rostersSnap, examsSnap] = await Promise.all([
           getDocs(getPublicCollectionRef('rosters')),
           getDocs(getPublicCollectionRef('exams'))
@@ -361,6 +416,7 @@
     window.syncStaffData = async function() {
       if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
       try {
+        await ensureAuthenticatedSession();
         const tasks = [getDocs(getPublicCollectionRef('results'))];
         if (window.SAS_APP.currentUser.role === 'admin') {
           tasks.push(getDocs(getPublicCollectionRef('teachers')));
@@ -380,7 +436,9 @@
       const activeSection = document.querySelector('.view-section:not(.hidden)');
       if (!activeSection) return;
       const id = activeSection.id;
-      if (id === 'home-view') window.onStudentClassChange();
+      if (id === 'home-view' && document.getElementById('student-select-class')?.value) {
+        window.onStudentClassChange();
+      }
       if (id === 'dashboard-view') window.renderDashboard();
       if (id === 'rekap-view') window.renderRekapTable();
       if (id === 'users-view') window.renderUsersManagement();
@@ -412,9 +470,7 @@
           if (!found) throw new Error('Username atau Password Guru tidak cocok.');
           return found;
         } else {
-          if (!window.SAS_APP.auth.currentUser) {
-            await signInAnonymously(window.SAS_APP.auth);
-          }
+          await ensureAuthenticatedSession();
           const snap = await getDocs(getPublicCollectionRef('teachers'));
           const teachersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           const found = teachersList.find(
@@ -438,6 +494,7 @@
           window.SAS_APP.data.exams.push(newDoc);
           return newDoc;
         } else {
+          await ensureAuthenticatedSession();
           const docRef = await addDoc(getPublicCollectionRef('exams'), examPayload);
           const created = { id: docRef.id, ...examPayload };
           window.SAS_APP.data.exams.push(created);
@@ -450,6 +507,7 @@
           const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
           if (ex) ex.status = newStatus;
         } else {
+          await ensureAuthenticatedSession();
           await updateDoc(getPublicDocRef('exams', examId), { status: newStatus });
           const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
           if (ex) ex.status = newStatus;
@@ -460,6 +518,7 @@
         if (IS_PREVIEW) {
           window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
         } else {
+          await ensureAuthenticatedSession();
           await deleteDoc(getPublicDocRef('exams', examId));
           window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
         }
@@ -471,6 +530,7 @@
           window.SAS_APP.data.results.push(newRes);
           return newRes;
         } else {
+          await ensureAuthenticatedSession();
           const uniqueResId = `${resultPayload.examId}_${resultPayload.studentId}`;
           await setDoc(getPublicDocRef('results', uniqueResId), resultPayload);
           const saved = { id: uniqueResId, ...resultPayload };
@@ -483,6 +543,7 @@
         if (IS_PREVIEW) {
           return window.SAS_APP.data.results.some(r => r.examId === examId && r.studentId === studentId);
         } else {
+          await ensureAuthenticatedSession();
           const snap = await getDoc(getPublicDocRef('results', `${examId}_${studentId}`));
           return snap.exists();
         }
@@ -507,15 +568,18 @@
             ...merged
           ];
         } else {
+          await window.fetchClassRosterFromFirestore(className);
           const existing = window.SAS_APP.data.students
             .filter(s => s.class === className)
             .map(s => ({ id: s.id, name: s.name }));
           const merged = [...existing, ...cleanList];
+          
           await setDoc(getPublicDocRef('rosters', className), {
             class: className,
             list: merged,
             updatedAt: new Date().toISOString()
           });
+          
           window.SAS_APP.data.students = [
             ...window.SAS_APP.data.students.filter(s => s.class !== className),
             ...merged.map(m => ({ id: m.id, name: m.name, class: className }))
@@ -563,7 +627,7 @@
     };
 
     window.addEventListener('DOMContentLoaded', async () => {
-      lucide.createIcons();
+      window.safeCreateIcons();
 
       if (IS_PREVIEW) {
         loadPreviewDummyData();
@@ -584,10 +648,14 @@
     <header class="bg-brand-navy text-white sticky top-0 z-40 shadow-md border-b border-slate-800">
       <div class="max-w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         
-        <!-- Logo & Title -->
+        <!-- Logo & Title (Inline SVG agar selalu tajam & terbaca di semua host/browser) -->
         <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" onclick="switchView('home-view')">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-brand-gold to-amber-300 flex items-center justify-center shadow text-brand-navy font-bold shrink-0 border border-amber-200">
-            <i data-lucide="graduation-cap" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" aria-hidden="true">
+              <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/>
+              <path d="M22 10v6"/>
+              <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>
+            </svg>
           </div>
           <div class="min-w-0">
             <h1 class="font-extrabold text-xs sm:text-base tracking-tight text-white leading-tight truncate">SDN 011 SANGATTA SELATAN</h1>
@@ -604,7 +672,11 @@
           </div>
 
           <button id="btn-login-modal" onclick="openLoginModal()" class="flex items-center space-x-1.5 bg-brand-gold hover:bg-brand-goldHover active:scale-95 text-slate-950 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-extrabold transition shadow">
-            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0" aria-hidden="true">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" x2="3" y1="12" y2="12"/>
+            </svg>
             <span class="hidden sm:inline">Portal Guru / Admin</span>
             <span class="sm:hidden">Staf</span>
           </button>
@@ -1198,7 +1270,10 @@
 
       <div class="text-center mb-5">
         <div class="w-12 h-12 bg-slate-900 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow">
-          <i data-lucide="shield-check" class="w-6 h-6"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-amber-400" aria-hidden="true">
+            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
         </div>
         <h3 class="text-lg font-extrabold text-slate-900">Portal Guru & Panitia SAS</h3>
         <p class="text-xs text-slate-500">Pilih peran akses untuk masuk ke sistem pengelolaan ujian</p>
@@ -1321,6 +1396,12 @@
   <script>
     let parsedDocxQuestions = [];
 
+    window.safeCreateIcons = function() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    };
+
     window.showNotify = function(title, message, isError = false) {
       const modal = document.getElementById('custom-dialog-modal');
       const iconWrap = document.getElementById('dialog-icon-wrap');
@@ -1340,7 +1421,7 @@
       okBtn.onclick = () => closeCustomDialog();
 
       modal.classList.remove('hidden');
-      lucide.createIcons();
+      window.safeCreateIcons();
     };
 
     window.openConfirmModal = function(title, message, onConfirmCallback) {
@@ -1360,7 +1441,7 @@
       };
 
       modal.classList.remove('hidden');
-      lucide.createIcons();
+      window.safeCreateIcons();
     };
 
     window.closeCustomDialog = function() {
@@ -1404,7 +1485,7 @@
         }
       });
 
-      setTimeout(() => lucide.createIcons(), 50);
+      setTimeout(() => window.safeCreateIcons(), 50);
 
       if (viewId === 'dashboard-view') {
         await window.syncStaffData();
@@ -1514,7 +1595,7 @@
       }
     };
 
-    window.onStudentClassChange = function() {
+    window.onStudentClassChange = async function() {
       const selectedClass = document.getElementById('student-select-class').value;
       const nameSelect = document.getElementById('student-select-name');
       
@@ -1522,6 +1603,13 @@
         nameSelect.disabled = true;
         nameSelect.innerHTML = '<option value="">-- Pilih Kelas Terlebih Dahulu --</option>';
         return;
+      }
+
+      nameSelect.disabled = true;
+      nameSelect.innerHTML = '<option value="">Memuat daftar nama siswa...</option>';
+
+      if (!window.SAS_APP.IS_PREVIEW) {
+        await window.fetchClassRosterFromFirestore(selectedClass);
       }
 
       const filteredStudents = window.SAS_APP.data.students.filter(s => s.class === selectedClass);
@@ -1579,7 +1667,7 @@
         }));
         examListContainer.innerHTML = cardsHtml.join('');
       }
-      lucide.createIcons();
+      window.safeCreateIcons();
     };
 
     window.startStudentExam = function(examId, studentId, studentName, studentClass) {
@@ -2195,7 +2283,7 @@
 
       modal.classList.remove('hidden');
       renderAnalysisMatrix();
-      lucide.createIcons();
+      window.safeCreateIcons();
     };
 
     window.closeAnalysisModal = function() {

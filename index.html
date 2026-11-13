@@ -20,8 +20,8 @@
   <!-- Mammoth.js CDN untuk Import Word (.docx) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 
-  <!-- Google Fonts: Plus Jakarta Sans -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Google Fonts: Plus Jakarta Sans & Noto Naskh Arabic / Amiri (Dukungan Tulisan Arab) -->
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -47,9 +47,44 @@
 
   <style>
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Plus Jakarta Sans', 'Noto Naskh Arabic', sans-serif;
       -webkit-tap-highlight-color: transparent;
       overflow-x: hidden;
+    }
+    .arabic-aware {
+      font-family: 'Plus Jakarta Sans', 'Noto Naskh Arabic', 'Amiri', serif;
+      unicode-bidi: plaintext;
+    }
+    .arabic-rtl {
+      font-family: 'Noto Naskh Arabic', 'Amiri', serif;
+      font-size: 1.28em;
+      line-height: 2;
+      direction: rtl;
+      text-align: right;
+      display: block;
+    }
+    .exam-rich-content img {
+      max-width: 100%;
+      max-height: 260px;
+      height: auto;
+      border-radius: 0.75rem;
+      border: 1px solid #E2E8F0;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+      display: block;
+      object-fit: contain;
+      background: #FFFFFF;
+    }
+    .option-rich-content img {
+      max-width: 100%;
+      max-height: 150px;
+      height: auto;
+      border-radius: 0.5rem;
+      border: 1px solid #E2E8F0;
+      margin-top: 0.35rem;
+      display: block;
+      object-fit: contain;
+      background: #FFFFFF;
     }
     .glass-card {
       background: rgba(255, 255, 255, 0.96);
@@ -890,8 +925,8 @@
 
               <!-- Pertanyaan & Opsi Jawaban -->
               <div id="question-container" class="space-y-4 sm:space-y-6">
-                <div id="question-text" class="text-[15px] sm:text-lg font-semibold text-slate-800 leading-relaxed">
-                  <!-- Text Soal Dimuat via JS -->
+                <div id="question-text" class="text-[15px] sm:text-lg font-semibold text-slate-800 leading-relaxed arabic-aware exam-rich-content">
+                  <!-- Text & Gambar Soal Dimuat via JS -->
                 </div>
 
                 <div id="options-container" class="space-y-2.5 sm:space-y-3 pt-1">
@@ -1082,7 +1117,7 @@
               <!-- Dropzone File Docx -->
               <div class="border-2 border-dashed border-slate-300 hover:border-brand-gold rounded-2xl p-5 sm:p-7 text-center bg-slate-50/70 transition">
                 <i data-lucide="file-text" class="w-9 h-9 text-slate-400 mx-auto mb-2"></i>
-                <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx)</p>
+                <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx) — Mendukung Gambar & Tulisan Arab</p>
                 <p class="text-[11px] text-slate-500 mb-3">Format penulisan berurutan: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
                 <input type="file" id="docx-file-input" accept=".docx" class="hidden" onchange="processDocxImport(this)">
                 <button type="button" onclick="document.getElementById('docx-file-input').click()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">
@@ -1878,7 +1913,10 @@
       const question = exam.questions[idx];
 
       document.getElementById('current-question-num').innerText = `${idx + 1} / ${exam.questions.length}`;
-      document.getElementById('question-text').innerHTML = `${idx + 1}. ${question.question}`;
+      const formattedQuestion = formatRichExamText(question.question);
+      const isMainArabic = isDominantArabic(question.question);
+      const qTextEl = document.getElementById('question-text');
+      qTextEl.innerHTML = `<div class="flex items-start gap-2"><span class="shrink-0 font-extrabold">${idx + 1}.</span><div class="flex-1 ${isMainArabic ? 'arabic-rtl' : 'arabic-aware'}">${formattedQuestion}</div></div>`;
 
       const optionsContainer = document.getElementById('options-container');
       const selectedAnswer = window.SAS_APP.examAnswers[idx];
@@ -1886,10 +1924,12 @@
       optionsContainer.innerHTML = ['A', 'B', 'C', 'D'].map(key => {
         const value = question.options[key] || '-';
         const isChecked = selectedAnswer === key;
+        const optIsArabic = isDominantArabic(value);
+        const formattedOpt = formatRichExamText(value);
         return `
           <button type="button" onclick="selectOption('${key}')" class="w-full text-left option-btn-touch flex items-center space-x-3.5 p-3.5 rounded-xl border transition active:scale-[0.99] ${isChecked ? 'bg-amber-100 border-amber-500 font-bold ring-2 ring-amber-400' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}">
             <span class="w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 ${isChecked ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">${key}</span>
-            <span class="text-sm sm:text-base text-slate-900 leading-snug">${value}</span>
+            <span class="flex-1 text-sm sm:text-base text-slate-900 leading-snug option-rich-content ${optIsArabic ? 'arabic-rtl' : 'arabic-aware'}">${formattedOpt}</span>
           </button>
         `;
       }).join('');
@@ -1899,22 +1939,17 @@
       document.getElementById('btn-next-question').disabled = idx === exam.questions.length - 1;
     }
 
-    window.selectOption = function(key) {
+    window.selectOption = function(optKey) {
       const idx = window.SAS_APP.currentQuestionIdx;
-      window.SAS_APP.examAnswers[idx] = key;
+      window.SAS_APP.examAnswers[idx] = optKey;
       renderCurrentQuestion();
       renderQuestionGrid();
     };
 
-    window.toggleDoubtState = function() {
-      const idx = window.SAS_APP.currentQuestionIdx;
-      window.SAS_APP.examDoubts[idx] = document.getElementById('doubt-checkbox').checked;
-      renderQuestionGrid();
-    };
-
-    window.navigateQuestion = function(direction) {
-      const newIdx = window.SAS_APP.currentQuestionIdx + direction;
-      if (newIdx >= 0 && newIdx < window.SAS_APP.activeExam.questions.length) {
+    window.navigateQuestion = function(delta) {
+      const exam = window.SAS_APP.activeExam;
+      const newIdx = window.SAS_APP.currentQuestionIdx + delta;
+      if (newIdx >= 0 && newIdx < exam.questions.length) {
         window.SAS_APP.currentQuestionIdx = newIdx;
         renderCurrentQuestion();
         renderQuestionGrid();
@@ -1925,93 +1960,178 @@
       window.SAS_APP.currentQuestionIdx = idx;
       renderCurrentQuestion();
       renderQuestionGrid();
-      if (window.innerWidth < 1024) {
-        document.getElementById('question-grid-sidebar').classList.add('hidden');
+      const sidebar = document.getElementById('question-grid-sidebar');
+      if (sidebar && !sidebar.classList.contains('hidden') && window.innerWidth < 1024) {
+        sidebar.classList.add('hidden');
       }
     };
 
-    window.toggleMobileQuestionGrid = function() {
-      document.getElementById('question-grid-sidebar').classList.toggle('hidden');
+    window.toggleDoubtState = function() {
+      const idx = window.SAS_APP.currentQuestionIdx;
+      const checked = document.getElementById('doubt-checkbox').checked;
+      if (checked) {
+        window.SAS_APP.examDoubts[idx] = true;
+      } else {
+        delete window.SAS_APP.examDoubts[idx];
+      }
+      renderQuestionGrid();
     };
 
     function renderQuestionGrid() {
       const exam = window.SAS_APP.activeExam;
-      const gridContainer = document.getElementById('question-grid');
+      const grid = document.getElementById('question-grid');
+      if (!exam || !grid) return;
 
-      gridContainer.innerHTML = exam.questions.map((q, idx) => {
-        const isAnswered = window.SAS_APP.examAnswers[idx] !== undefined;
-        const isDoubt = window.SAS_APP.examDoubts[idx];
-        const isCurrent = window.SAS_APP.currentQuestionIdx === idx;
+      grid.innerHTML = exam.questions.map((q, idx) => {
+        const isCurrent = idx === window.SAS_APP.currentQuestionIdx;
+        const isAnswered = !!window.SAS_APP.examAnswers[idx];
+        const isDoubt = !!window.SAS_APP.examDoubts[idx];
 
-        let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
-        if (isDoubt) badgeClass = 'bg-amber-500 text-white font-bold';
-        else if (isAnswered) badgeClass = 'bg-emerald-600 text-white font-bold';
+        let btnClass = 'bg-slate-200 text-slate-700 border-slate-300';
+        if (isDoubt) {
+          btnClass = 'bg-amber-500 text-white border-amber-600';
+        } else if (isAnswered) {
+          btnClass = 'bg-emerald-600 text-white border-emerald-700';
+        }
 
-        if (isCurrent) badgeClass += ' ring-2 ring-slate-900 ring-offset-1';
+        const ringClass = isCurrent ? 'ring-2 ring-offset-1 ring-slate-900 scale-105' : '';
 
         return `
-          <button onclick="jumpToQuestion(${idx})" class="w-9 h-9 rounded-lg text-xs flex items-center justify-center border transition ${badgeClass}">
+          <button type="button" onclick="jumpToQuestion(${idx})" class="h-9 rounded-lg border font-extrabold text-xs flex items-center justify-center transition ${btnClass} ${ringClass}">
             ${idx + 1}
           </button>
         `;
       }).join('');
     }
 
+    window.toggleMobileQuestionGrid = function() {
+      const sidebar = document.getElementById('question-grid-sidebar');
+      if (sidebar) {
+        sidebar.classList.toggle('hidden');
+      }
+    };
+
     window.submitExam = async function(isAutoTimeout = false) {
       clearInterval(window.SAS_APP.examTimer);
-
       const exam = window.SAS_APP.activeExam;
-      const answers = { ...window.SAS_APP.examAnswers };
+      const profile = window.SAS_APP.userProfile;
+      if (!exam || !profile) return;
+
       let correctCount = 0;
+      const totalQuestions = exam.questions.length;
 
       exam.questions.forEach((q, idx) => {
-        if (answers[idx] === q.answer) {
+        if (window.SAS_APP.examAnswers[idx] === q.answer) {
           correctCount++;
         }
       });
 
-      const score = Math.round((correctCount / exam.questions.length) * 100);
-
-      const resultObj = {
-        examId: exam.id,
-        examTitle: exam.title,
-        studentId: window.SAS_APP.userProfile.id,
-        studentName: window.SAS_APP.userProfile.name,
-        studentClass: window.SAS_APP.userProfile.class,
-        subject: exam.subject,
-        score: score,
-        correctCount: correctCount,
-        totalQuestions: exam.questions.length,
-        studentAnswers: answers,
-        completedAt: new Date().toLocaleString('id-ID')
-      };
+      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      const nowStr = new Date().toLocaleDateString('id-ID') + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
       try {
-        await window.DB_SERVICE.submitExamResult(resultObj);
-        const prefix = isAutoTimeout ? 'Waktu Habis! Jawaban otomatis dikirim.\n\n' : '';
-        showNotify(
-          'Ujian Selesai!',
-          `${prefix}Peserta: ${resultObj.studentName}\nNilai Akhir: ${score} / 100\nJawaban Benar: ${correctCount} dari ${exam.questions.length} soal.`
-        );
+        await window.DB_SERVICE.submitExamResult({
+          examId: exam.id,
+          examTitle: exam.title,
+          studentId: profile.id,
+          studentName: profile.name,
+          studentClass: profile.class,
+          subject: exam.subject,
+          score,
+          correctCount,
+          totalQuestions,
+          studentAnswers: { ...window.SAS_APP.examAnswers },
+          completedAt: nowStr
+        });
+
+        window.SAS_APP.activeExam = null;
+        window.SAS_APP.examAnswers = {};
+        window.SAS_APP.examDoubts = {};
+
         switchView('home-view');
         loadAvailableExamsForStudent();
+
+        showNotify(
+          isAutoTimeout ? 'Waktu Ujian Habis!' : 'Ujian Selesai & Terkirim!',
+          `Terima kasih ${profile.name}.\nJawaban Anda telah berhasil disimpan ke sistem.`
+        );
       } catch (err) {
         showNotify('Gagal Mengirim Jawaban', err.message, true);
       }
     };
 
+    function compressBase64Image(dataUri, maxWidth = 680, quality = 0.78) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxWidth) {
+            h = Math.round((h * maxWidth) / w);
+            w = maxWidth;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = function() {
+          resolve(dataUri);
+        };
+        img.src = dataUri;
+      });
+    }
+
+    function isDominantArabic(htmlOrText) {
+      if (!htmlOrText) return false;
+      const plain = String(htmlOrText).replace(/<[^>]*>/g, '').trim();
+      if (!plain) return false;
+      const arabicChars = (plain.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) || []).length;
+      const latinChars = (plain.match(/[A-Za-z]/g) || []).length;
+      return arabicChars > 0 && arabicChars >= latinChars;
+    }
+
+    function formatRichExamText(content) {
+      if (!content) return '-';
+      const parts = String(content).split(/(<img[^>]+>)/gi);
+      return parts.map(part => {
+        if (/^<img/i.test(part)) return part;
+        const trimmed = part.trim();
+        if (!trimmed) return '';
+        if (isDominantArabic(trimmed)) {
+          return `<span class="arabic-rtl my-1">${trimmed}</span>`;
+        }
+        return part;
+      }).join(' ');
+    }
+
     window.processDocxImport = function(inputElement) {
       const file = inputElement.files[0];
       if (!file) return;
 
-      document.getElementById('file-name-display').innerText = `File terpilih: ${file.name}`;
+      document.getElementById('file-name-display').innerText = `Memproses file (teks, Arab & gambar): ${file.name}...`;
 
       const reader = new FileReader();
       reader.onload = function(e) {
         const arrayBuffer = e.target.result;
-        mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+        const options = {
+          convertImage: mammoth.images.imgElement(function(image) {
+            return image.read("base64").then(async function(imageBuffer) {
+              const rawUri = "data:" + image.contentType + ";base64," + imageBuffer;
+              const compressedUri = await compressBase64Image(rawUri);
+              return { src: compressedUri };
+            });
+          })
+        };
+
+        mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options)
           .then(function(result) {
-            parseDocxContent(result.value);
+            document.getElementById('file-name-display').innerText = `File terpilih: ${file.name}`;
+            parseDocxHtmlContent(result.value);
           })
           .catch(function(err) {
             showNotify('Gagal Membaca Dokumen', err.message, true);
@@ -2020,30 +2140,73 @@
       reader.readAsArrayBuffer(file);
     };
 
-    function parseDocxContent(text) {
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    function sanitizeInnerRichHtml(htmlStr) {
+      const temp = document.createElement('div');
+      temp.innerHTML = htmlStr;
+      temp.querySelectorAll('script, style, iframe, object').forEach(el => el.remove());
+      temp.querySelectorAll('*').forEach(el => {
+        if (el.tagName === 'IMG') {
+          const src = el.getAttribute('src') || '';
+          Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+          if (src.startsWith('data:image/')) el.setAttribute('src', src);
+        } else {
+          Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+        }
+      });
+      return temp.innerHTML.trim();
+    }
+
+    function parseDocxHtmlContent(html) {
+      const container = document.createElement('div');
+      container.innerHTML = html;
+
+      // Pecah blok paragraf / baris tabel / list item agar urutan teks & gambar terjaga
+      const rawBlocks = [];
+      container.querySelectorAll('p, li, h1, h2, h3, h4, td').forEach(node => {
+        if (node.tagName === 'TD' && node.querySelector('p, li')) return;
+        const cleanHtml = sanitizeInnerRichHtml(node.innerHTML);
+        const plainText = (node.textContent || '').replace(/\u00A0/g, ' ').trim();
+        const hasImg = /<img\s/i.test(cleanHtml);
+        if (plainText.length > 0 || hasImg) {
+          rawBlocks.push({ html: cleanHtml, text: plainText, hasImg });
+        }
+      });
+
       parsedDocxQuestions = [];
       let currentQ = null;
+      let lastTarget = null; // 'question' | 'A' | 'B' | 'C' | 'D'
 
-      lines.forEach(line => {
-        const qMatch = line.match(/^(\d+)[\.\)]\s*(.+)/);
-        const optMatch = line.match(/^([A-D])[\.\)]\s*(.+)/i);
-        const keyMatch = line.match(/^(kunci|jawaban|kunci jawaban)[\s:]*([A-D])/i);
+      rawBlocks.forEach(block => {
+        const plain = block.text;
+        const qMatch = plain.match(/^(\d+)[\.\)]\s*(.*)/s);
+        const optMatch = plain.match(/^([A-D])[\.\)]\s*(.*)/is);
+        const keyMatch = plain.match(/^(?:kunci|jawaban|kunci jawaban)[\s:]*([A-D])/i);
 
         if (qMatch) {
           if (currentQ) parsedDocxQuestions.push(currentQ);
+          const strippedHtml = block.html.replace(/^\s*(?:<[^>]+>)*\s*\d+[\.\)]\s*/i, '').trim();
           currentQ = {
             id: parseInt(qMatch[1]),
-            question: qMatch[2],
+            question: strippedHtml || qMatch[2],
             options: {},
             answer: 'A'
           };
+          lastTarget = 'question';
         } else if (optMatch && currentQ) {
-          currentQ.options[optMatch[1].toUpperCase()] = optMatch[2];
+          const optKey = optMatch[1].toUpperCase();
+          const strippedOptHtml = block.html.replace(/^\s*(?:<[^>]+>)*\s*[A-D][\.\)]\s*/i, '').trim();
+          currentQ.options[optKey] = strippedOptHtml || optMatch[2];
+          lastTarget = optKey;
         } else if (keyMatch && currentQ) {
-          currentQ.answer = keyMatch[2].toUpperCase();
-        } else if (currentQ && !optMatch && !keyMatch) {
-          currentQ.question += ' ' + line;
+          currentQ.answer = keyMatch[1].toUpperCase();
+          lastTarget = null;
+        } else if (currentQ) {
+          // Lanjutan paragraf atau gambar yang berada di bawah soal / di bawah opsi A-D
+          if (lastTarget && ['A', 'B', 'C', 'D'].includes(lastTarget)) {
+            currentQ.options[lastTarget] = (currentQ.options[lastTarget] || '') + '<br>' + block.html;
+          } else {
+            currentQ.question += '<br>' + block.html;
+          }
         }
       });
 
@@ -2061,13 +2224,13 @@
       }
 
       container.innerHTML = parsedDocxQuestions.map((q, idx) => `
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
-          <p class="font-bold text-slate-900">${idx + 1}. ${q.question}</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-slate-600 pl-2">
-            <span><b>A.</b> ${q.options.A || '-'}</span>
-            <span><b>B.</b> ${q.options.B || '-'}</span>
-            <span><b>C.</b> ${q.options.C || '-'}</span>
-            <span><b>D.</b> ${q.options.D || '-'}</span>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
+          <div class="font-bold text-slate-900 exam-rich-content arabic-aware">${idx + 1}. ${formatRichExamText(q.question)}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-600 pl-2">
+            <div class="option-rich-content arabic-aware"><b>A.</b> ${formatRichExamText(q.options.A || '-')}</div>
+            <div class="option-rich-content arabic-aware"><b>B.</b> ${formatRichExamText(q.options.B || '-')}</div>
+            <div class="option-rich-content arabic-aware"><b>C.</b> ${formatRichExamText(q.options.C || '-')}</div>
+            <div class="option-rich-content arabic-aware"><b>D.</b> ${formatRichExamText(q.options.D || '-')}</div>
           </div>
           <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded">Kunci Jawaban: ${q.answer}</span>
         </div>

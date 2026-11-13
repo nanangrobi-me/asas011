@@ -164,14 +164,14 @@
     // PENTING: Ubah menjadi false saat dipasang di GitHub & Netlify
     const IS_PREVIEW = false; 
 
-    // TEMPELKAN FIREBASE CONFIG MILIK ANDA DI BAWAH INI
+    // Konfigurasi Firebase Project asas011
     const firebaseConfig = {
-     apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
-  authDomain: "asas011.firebaseapp.com",
-  projectId: "asas011",
-  storageBucket: "asas011.firebasestorage.app",
-  messagingSenderId: "625005082543",
-  appId: "1:625005082543:web:5b44953d682487c9e9e15a"
+      apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
+      authDomain: "asas011.firebaseapp.com",
+      projectId: "asas011",
+      storageBucket: "asas011.firebasestorage.app",
+      messagingSenderId: "625005082543",
+      appId: "1:625005082543:web:5b44953d682487c9e9e15a"
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -227,7 +227,8 @@
       classes: ['3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B'],
       subjects: [
         'Bahasa Indonesia', 'Matematika', 'IPAS', 'PJOK', 
-        'Pendidikan Pancasila', 'Bahasa Inggris', 'Pendidikan Agama', 'Seni Budaya'
+        'Pendidikan Pancasila', 'Bahasa Inggris', 'Pendidikan Agama', 'Seni Budaya',
+        'Koding', 'Bahasa Kutai'
       ],
 
       data: {
@@ -511,6 +512,27 @@
           await updateDoc(getPublicDocRef('exams', examId), { status: newStatus });
           const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
           if (ex) ex.status = newStatus;
+        }
+      },
+
+      async updateExamSchedule(examId, startTime, endTime) {
+        if (IS_PREVIEW) {
+          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+          if (ex) {
+            ex.startTime = startTime || '';
+            ex.endTime = endTime || '';
+          }
+        } else {
+          await ensureAuthenticatedSession();
+          await updateDoc(getPublicDocRef('exams', examId), {
+            startTime: startTime || '',
+            endTime: endTime || ''
+          });
+          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+          if (ex) {
+            ex.startTime = startTime || '';
+            ex.endTime = endTime || '';
+          }
         }
       },
 
@@ -986,13 +1008,14 @@
               Daftar Paket Asesmen Terdaftar
             </h3>
             <div class="overflow-x-auto -mx-4 sm:mx-0">
-              <table class="w-full text-left text-xs text-slate-700 min-w-[620px]">
+              <table class="w-full text-left text-xs text-slate-700 min-w-[740px]">
                 <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
                   <tr>
                     <th class="py-3 px-4">Judul Asesmen</th>
                     <th class="py-3 px-4">Mata Pelajaran</th>
                     <th class="py-3 px-4">Kelas</th>
                     <th class="py-3 px-4">Durasi</th>
+                    <th class="py-3 px-4">Jadwal Pelaksanaan</th>
                     <th class="py-3 px-4">Jumlah Soal</th>
                     <th class="py-3 px-4">Status</th>
                     <th class="py-3 px-4 text-right">Aksi</th>
@@ -1033,6 +1056,26 @@
                 <div>
                   <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Durasi (Menit)</label>
                   <input type="number" id="exam-input-duration" value="60" min="5" max="180" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                </div>
+              </div>
+
+              <!-- Pengaturan Jadwal Ujian (Kunci Otomatis Sebelum Jadwal) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-amber-50/70 p-3.5 sm:p-4 rounded-xl border border-amber-200">
+                <div>
+                  <label class="block text-xs font-bold text-slate-800 uppercase mb-1 flex items-center gap-1.5">
+                    <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-brand-gold"></i>
+                    Jadwal Mulai Ujian (Kunci Otomatis)
+                  </label>
+                  <input type="datetime-local" id="exam-input-start-time" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                  <p class="text-[10px] text-slate-500 mt-1">Siswa tidak dapat menekan "Mulai Ujian" sebelum waktu ini tiba.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-800 uppercase mb-1 flex items-center gap-1.5">
+                    <i data-lucide="calendar-x" class="w-3.5 h-3.5 text-rose-500"></i>
+                    Batas Akhir Akses (Opsional)
+                  </label>
+                  <input type="datetime-local" id="exam-input-end-time" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
+                  <p class="text-[10px] text-slate-500 mt-1">Kosongkan jika tidak ada batas penutupan otomatis.</p>
                 </div>
               </div>
 
@@ -1331,6 +1374,45 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL ATUR JADWAL UJIAN (GURU / ADMIN) ==================== -->
+  <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+      <button onclick="closeScheduleModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="mb-4">
+        <span class="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase mb-2">
+          <i data-lucide="calendar-clock" class="w-3.5 h-3.5"></i> Pengaturan Jadwal Ujian
+        </span>
+        <h3 id="schedule-modal-title" class="text-base font-extrabold text-slate-900">Atur Jadwal Pelaksanaan</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Ujian akan terkunci otomatis di halaman siswa hingga waktu mulai tiba.</p>
+      </div>
+
+      <form onsubmit="handleUpdateSchedule(event)" class="space-y-4">
+        <input type="hidden" id="schedule-exam-id">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Waktu Mulai Ujian</label>
+          <input type="datetime-local" id="schedule-input-start" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-brand-gold font-semibold">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Batas Akhir Ujian (Opsional)</label>
+          <input type="datetime-local" id="schedule-input-end" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-brand-gold font-semibold">
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-2">
+          <button type="button" onclick="clearScheduleInputs()" class="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-2">
+            Buka Kunci (Tanpa Jadwal)
+          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeScheduleModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl">Batal</button>
+            <button type="submit" id="btn-save-schedule" class="bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow">Simpan Jadwal</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ==================== MODAL REKAP ANALISIS JAWABAN BUTIR SOAL ==================== -->
   <div id="analysis-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6">
     <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden relative">
@@ -1623,6 +1705,37 @@
       }
     };
 
+    window.formatScheduleLabel = function(isoLocalStr) {
+      if (!isoLocalStr) return '';
+      const d = new Date(isoLocalStr);
+      if (isNaN(d.getTime())) return isoLocalStr;
+      return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) +
+        ' • ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+    };
+
+    window.getExamScheduleState = function(exam) {
+      const now = Date.now();
+      const startMs = exam.startTime ? new Date(exam.startTime).getTime() : null;
+      const endMs = exam.endTime ? new Date(exam.endTime).getTime() : null;
+
+      if (startMs && !isNaN(startMs) && now < startMs) {
+        return {
+          status: 'locked_before',
+          label: `Mulai: ${window.formatScheduleLabel(exam.startTime)}`
+        };
+      }
+      if (endMs && !isNaN(endMs) && now > endMs) {
+        return {
+          status: 'locked_after',
+          label: `Berakhir: ${window.formatScheduleLabel(exam.endTime)}`
+        };
+      }
+      return {
+        status: 'open',
+        label: startMs ? `Dibuka (${window.formatScheduleLabel(exam.startTime)})` : 'Siap Dikerjakan'
+      };
+    };
+
     window.loadAvailableExamsForStudent = async function() {
       const selectedClass = document.getElementById('student-select-class').value;
       const nameSelect = document.getElementById('student-select-name');
@@ -1649,19 +1762,45 @@
       } else {
         const cardsHtml = await Promise.all(exams.map(async (ex) => {
           const alreadyDone = await window.DB_SERVICE.checkStudentAlreadySubmitted(ex.id, selectedStudentId);
+          const schedState = window.getExamScheduleState(ex);
+
+          let actionHtml = '';
+          let scheduleMetaHtml = '';
+
+          if (ex.startTime || ex.endTime) {
+            const startText = ex.startTime ? window.formatScheduleLabel(ex.startTime) : 'Sekarang';
+            const endText = ex.endTime ? ` s/d ${window.formatScheduleLabel(ex.endTime)}` : '';
+            scheduleMetaHtml = `<p class="text-[11px] font-semibold text-amber-700 mt-1 flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3.5 h-3.5 shrink-0"></i> Jadwal: ${startText}${endText}</p>`;
+          }
+
+          if (alreadyDone) {
+            actionHtml = `<span class="bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shrink-0"><i data-lucide="check-circle" class="w-4 h-4"></i> Sudah Dikerjakan</span>`;
+          } else if (schedState.status === 'locked_before') {
+            actionHtml = `
+              <button type="button" onclick="showNotify('Ujian Belum Dibuka', 'Soal asesmen ini masih terkunci dan baru dapat dikerjakan pada jadwal:\\n${window.formatScheduleLabel(ex.startTime)}', true)" class="bg-slate-200 text-slate-600 border border-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed shrink-0">
+                <i data-lucide="lock" class="w-4 h-4 text-amber-600"></i> Terkunci (Belum Jadwal)
+              </button>`;
+          } else if (schedState.status === 'locked_after') {
+            actionHtml = `
+              <span class="bg-rose-100 text-rose-700 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shrink-0">
+                <i data-lucide="lock" class="w-4 h-4"></i> Jadwal Berakhir
+              </span>`;
+          } else {
+            actionHtml = `
+              <button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation shrink-0">
+                <i data-lucide="play" class="w-4 h-4 text-amber-400"></i> Mulai Ujian
+              </button>`;
+          }
+
           return `
-            <div class="bg-white p-4 rounded-xl border border-slate-200 hover:border-brand-gold shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+            <div class="bg-white p-4 rounded-xl border ${schedState.status !== 'open' && !alreadyDone ? 'border-slate-200 bg-slate-50/60' : 'border-slate-200 hover:border-brand-gold'} shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
               <div>
                 <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded">${ex.subject}</span>
                 <h4 class="font-bold text-slate-900 text-sm mt-1.5">${ex.title}</h4>
                 <p class="text-xs text-slate-500 mt-0.5">Durasi: ${ex.duration} Menit | Jumlah: ${ex.questions.length} Soal</p>
+                ${scheduleMetaHtml}
               </div>
-              ${alreadyDone 
-                ? `<span class="bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4"></i> Sudah Dikerjakan</span>`
-                : `<button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation">
-                    <i data-lucide="play" class="w-4 h-4 text-amber-400"></i> Mulai Ujian
-                  </button>`
-              }
+              ${actionHtml}
             </div>
           `;
         }));
@@ -1674,6 +1813,18 @@
       const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
       if (!exam || !exam.questions || exam.questions.length === 0) {
         showNotify('Soal Tidak Tersedia', 'Paket soal ini belum memiliki daftar pertanyaan.', true);
+        return;
+      }
+
+      const schedState = window.getExamScheduleState(exam);
+      if (schedState.status === 'locked_before') {
+        showNotify('Ujian Terkunci', `Asesmen ini baru dapat dimulai pada jadwal:\n${window.formatScheduleLabel(exam.startTime)}`, true);
+        loadAvailableExamsForStudent();
+        return;
+      }
+      if (schedState.status === 'locked_after') {
+        showNotify('Jadwal Berakhir', `Waktu pelaksanaan asesmen ini telah berakhir pada:\n${window.formatScheduleLabel(exam.endTime)}`, true);
+        loadAvailableExamsForStudent();
         return;
       }
 
@@ -1929,6 +2080,13 @@
       const subject = document.getElementById('exam-input-subject').value;
       const targetClass = document.getElementById('exam-input-class').value;
       const duration = parseInt(document.getElementById('exam-input-duration').value);
+      const startTime = document.getElementById('exam-input-start-time').value || '';
+      const endTime = document.getElementById('exam-input-end-time').value || '';
+
+      if (startTime && endTime && new Date(endTime) <= new Date(startTime)) {
+        showNotify('Jadwal Tidak Valid', 'Waktu batas akhir ujian harus lebih lambat dari waktu mulai ujian.', true);
+        return;
+      }
 
       if (parsedDocxQuestions.length === 0) {
         showNotify('Soal Kosong', 'Harap unggah file .docx yang berisi soal terlebih dahulu!', true);
@@ -1945,6 +2103,8 @@
           subject,
           targetClass,
           duration,
+          startTime,
+          endTime,
           status: 'aktif',
           createdBy: window.SAS_APP.currentUser?.username || 'admin',
           createdAt: new Date().toISOString(),
@@ -2083,25 +2243,80 @@
 
       const tbody = document.getElementById('dashboard-exams-tbody');
       if (exams.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada paket ujian terdaftar. Klik tombol "Import Word (.docx)" untuk menambahkan soal.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Belum ada paket ujian terdaftar. Klik tombol "Import Word (.docx)" untuk menambahkan soal.</td></tr>`;
       } else {
-        tbody.innerHTML = exams.map(ex => `
+        tbody.innerHTML = exams.map(ex => {
+          const schedInfo = ex.startTime
+            ? `<span class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg inline-block">${window.formatScheduleLabel(ex.startTime)}</span>`
+            : `<span class="text-[11px] text-slate-500">Bebas / Langsung</span>`;
+          return `
           <tr class="hover:bg-slate-50">
             <td class="py-3 px-4 font-bold text-slate-900">${ex.title}</td>
             <td class="py-3 px-4">${ex.subject}</td>
             <td class="py-3 px-4"><span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded">Kelas ${ex.targetClass}</span></td>
             <td class="py-3 px-4">${ex.duration} Mnt</td>
+            <td class="py-3 px-4">${schedInfo}</td>
             <td class="py-3 px-4">${ex.questions?.length || 0} Soal</td>
             <td class="py-3 px-4">
               <button onclick="handleToggleExamStatus('${ex.id}', '${ex.status}')" class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase transition ${ex.status === 'aktif' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}">
                 ${ex.status}
               </button>
             </td>
-            <td class="py-3 px-4 text-right">
+            <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+              <button onclick="openScheduleModal('${ex.id}')" class="text-amber-700 hover:text-amber-900 font-bold">Jadwal</button>
               <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${ex.title} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
+      }
+    };
+
+    window.openScheduleModal = function(examId) {
+      const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!ex) return;
+      document.getElementById('schedule-exam-id').value = ex.id;
+      document.getElementById('schedule-modal-title').innerText = `Jadwal: ${ex.title}`;
+      document.getElementById('schedule-input-start').value = ex.startTime || '';
+      document.getElementById('schedule-input-end').value = ex.endTime || '';
+      document.getElementById('schedule-modal').classList.remove('hidden');
+      window.safeCreateIcons();
+    };
+
+    window.closeScheduleModal = function() {
+      document.getElementById('schedule-modal').classList.add('hidden');
+    };
+
+    window.clearScheduleInputs = function() {
+      document.getElementById('schedule-input-start').value = '';
+      document.getElementById('schedule-input-end').value = '';
+    };
+
+    window.handleUpdateSchedule = async function(e) {
+      e.preventDefault();
+      const examId = document.getElementById('schedule-exam-id').value;
+      const startTime = document.getElementById('schedule-input-start').value || '';
+      const endTime = document.getElementById('schedule-input-end').value || '';
+
+      if (startTime && endTime && new Date(endTime) <= new Date(startTime)) {
+        showNotify('Jadwal Tidak Valid', 'Batas akhir ujian harus lebih lambat dari waktu mulai ujian.', true);
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-schedule');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      try {
+        await window.DB_SERVICE.updateExamSchedule(examId, startTime, endTime);
+        closeScheduleModal();
+        renderDashboard();
+        showNotify('Jadwal Diperbarui', startTime ? `Ujian dikunci hingga jadwal mulai: ${window.formatScheduleLabel(startTime)}` : 'Kunci jadwal dilepas. Ujian dapat langsung dikerjakan.');
+      } catch (err) {
+        showNotify('Gagal Menyimpan Jadwal', err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Jadwal';
       }
     };
 

@@ -145,6 +145,13 @@
       animation: heroZoomIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.38s forwards;
     }
 
+    /* Menyembunyikan badge Powered by Netlify */
+    a[href*="netlify.com"] {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+
     @media print {
       @page {
         size: A4 landscape;

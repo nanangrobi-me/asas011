@@ -115,6 +115,36 @@
       width: 100%;
     }
 
+    @keyframes heroZoomIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.84) translateY(10px);
+      }
+      70% {
+        opacity: 1;
+        transform: scale(1.02) translateY(0);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    .animate-hero-zoom-1 {
+      opacity: 0;
+      transform-origin: left center;
+      animation: heroZoomIn 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+    }
+    .animate-hero-zoom-2 {
+      opacity: 0;
+      transform-origin: left center;
+      animation: heroZoomIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards;
+    }
+    .animate-hero-zoom-3 {
+      opacity: 0;
+      transform-origin: left center;
+      animation: heroZoomIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.38s forwards;
+    }
+
     @media print {
       @page {
         size: A4 landscape;
@@ -799,13 +829,13 @@
               <i data-lucide="file-text" class="w-64 h-64 sm:w-80 sm:h-80"></i>
             </div>
             <div class="relative z-10 max-w-2xl">
-              <span class="inline-block bg-brand-gold/20 text-brand-gold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold border border-brand-gold/30 mb-1.5 sm:mb-3">
+              <span class="animate-hero-zoom-1 inline-block bg-brand-gold/20 text-brand-gold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold border border-brand-gold/30 mb-1.5 sm:mb-3">
                 Tahun Ajaran 2026/2027
               </span>
-              <h2 class="text-lg sm:text-3xl font-extrabold tracking-tight mb-1 sm:mb-2">
+              <h2 class="animate-hero-zoom-2 text-lg sm:text-3xl font-extrabold tracking-tight mb-1 sm:mb-2">
                 Selamat Datang Peserta Didik
               </h2>
-              <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+              <p class="animate-hero-zoom-3 text-slate-300 text-xs sm:text-sm leading-relaxed">
                 Pilih <span class="text-amber-400 font-bold">Kelas</span> dan <span class="text-amber-400 font-bold">Nama Anda</span> di bawah ini untuk memulai ujian secara langsung.
               </p>
             </div>
@@ -1586,6 +1616,14 @@
       const targetView = document.getElementById(viewId);
       if (targetView) targetView.classList.remove('hidden');
 
+      if (viewId === 'home-view') {
+        document.querySelectorAll('.animate-hero-zoom-1, .animate-hero-zoom-2, .animate-hero-zoom-3').forEach(el => {
+          el.style.animation = 'none';
+          void el.offsetWidth;
+          el.style.animation = '';
+        });
+      }
+
       document.querySelectorAll('.desktop-nav-item').forEach(btn => {
         if (btn.dataset.nav === viewId) {
           btn.className = 'desktop-nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-800 text-amber-400 transition';
@@ -1606,17 +1644,17 @@
 
       if (viewId === 'dashboard-view') {
         await window.syncStaffData();
-        renderDashboard();
+        window.renderDashboard();
       }
       if (viewId === 'rekap-view') {
         await window.syncStaffData();
-        renderRekapTable();
+        window.renderRekapTable();
       }
       if (viewId === 'users-view') {
         await window.syncStaffData();
-        renderUsersManagement();
+        window.renderUsersManagement();
       }
-      if (viewId === 'import-view') populateExamFormDropdowns();
+      if (viewId === 'import-view') window.populateExamFormDropdowns();
     };
 
     window.updateNavigationVisibility = function() {
@@ -1723,9 +1761,9 @@
       }
 
       nameSelect.disabled = true;
-      nameSelect.innerHTML = '<option value="">Memuat daftar nama siswa...</option>';
+      nameSelect.innerHTML = '<option value="">Memuat daftar siswa...</option>';
 
-      if (!window.SAS_APP.IS_PREVIEW) {
+      if (!window.SAS_APP.IS_PREVIEW && typeof window.fetchClassRosterFromFirestore === 'function') {
         await window.fetchClassRosterFromFirestore(selectedClass);
       }
 
@@ -1740,35 +1778,83 @@
       }
     };
 
-    window.formatScheduleLabel = function(isoLocalStr) {
-      if (!isoLocalStr) return '';
-      const d = new Date(isoLocalStr);
-      if (isNaN(d.getTime())) return isoLocalStr;
-      return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) +
-        ' • ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
-    };
+    function formatScheduleDisplay(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
 
-    window.getExamScheduleState = function(exam) {
+    function getExamScheduleState(exam) {
       const now = Date.now();
-      const startMs = exam.startTime ? new Date(exam.startTime).getTime() : null;
-      const endMs = exam.endTime ? new Date(exam.endTime).getTime() : null;
-
-      if (startMs && !isNaN(startMs) && now < startMs) {
-        return {
-          status: 'locked_before',
-          label: `Mulai: ${window.formatScheduleLabel(exam.startTime)}`
-        };
+      if (exam.startTime) {
+        const startMs = new Date(exam.startTime).getTime();
+        if (!isNaN(startMs) && now < startMs) {
+          return {
+            state: 'locked_before',
+            label: `Dibuka: ${formatScheduleDisplay(exam.startTime)}`
+          };
+        }
       }
-      if (endMs && !isNaN(endMs) && now > endMs) {
-        return {
-          status: 'locked_after',
-          label: `Berakhir: ${window.formatScheduleLabel(exam.endTime)}`
-        };
+      if (exam.endTime) {
+        const endMs = new Date(exam.endTime).getTime();
+        if (!isNaN(endMs) && now > endMs) {
+          return {
+            state: 'locked_after',
+            label: `Ditutup: ${formatScheduleDisplay(exam.endTime)}`
+          };
+        }
       }
       return {
-        status: 'open',
-        label: startMs ? `Dibuka (${window.formatScheduleLabel(exam.startTime)})` : 'Siap Dikerjakan'
+        state: 'open',
+        label: exam.startTime ? `Jadwal: ${formatScheduleDisplay(exam.startTime)}` : 'Terbuka'
       };
+    }
+
+    function getSavedProgressKey(examId, studentId) {
+      return `sas_progress_${examId}_${studentId}`;
+    }
+
+    window.getSavedExamProgress = function(examId, studentId) {
+      try {
+        const raw = localStorage.getItem(getSavedProgressKey(examId, studentId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        return parsed;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    window.saveCurrentExamProgress = function() {
+      const exam = window.SAS_APP.activeExam;
+      const profile = window.SAS_APP.userProfile;
+      if (!exam || !profile || !profile.id) return;
+      try {
+        const payload = {
+          examAnswers: window.SAS_APP.examAnswers || {},
+          examDoubts: window.SAS_APP.examDoubts || {},
+          currentQuestionIdx: window.SAS_APP.currentQuestionIdx || 0,
+          timeLeft: window.SAS_APP.timeLeft,
+          updatedAt: Date.now()
+        };
+        localStorage.setItem(getSavedProgressKey(exam.id, profile.id), JSON.stringify(payload));
+      } catch (e) {
+        console.warn('Gagal menyimpan progres lokal:', e);
+      }
+    };
+
+    window.clearSavedExamProgress = function(examId, studentId) {
+      try {
+        localStorage.removeItem(getSavedProgressKey(examId, studentId));
+      } catch (e) {}
     };
 
     window.loadAvailableExamsForStudent = async function() {
@@ -1797,43 +1883,52 @@
       } else {
         const cardsHtml = await Promise.all(exams.map(async (ex) => {
           const alreadyDone = await window.DB_SERVICE.checkStudentAlreadySubmitted(ex.id, selectedStudentId);
-          const schedState = window.getExamScheduleState(ex);
+          const sched = getExamScheduleState(ex);
+          const savedProg = !alreadyDone ? window.getSavedExamProgress(ex.id, selectedStudentId) : null;
+          const answeredCount = savedProg ? Object.keys(savedProg.examAnswers || {}).length : 0;
 
           let actionHtml = '';
-          let scheduleMetaHtml = '';
-
-          if (ex.startTime || ex.endTime) {
-            const startText = ex.startTime ? window.formatScheduleLabel(ex.startTime) : 'Sekarang';
-            const endText = ex.endTime ? ` s/d ${window.formatScheduleLabel(ex.endTime)}` : '';
-            scheduleMetaHtml = `<p class="text-[11px] font-semibold text-amber-700 mt-1 flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3.5 h-3.5 shrink-0"></i> Jadwal: ${startText}${endText}</p>`;
-          }
-
           if (alreadyDone) {
-            actionHtml = `<span class="bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shrink-0"><i data-lucide="check-circle" class="w-4 h-4"></i> Sudah Dikerjakan</span>`;
-          } else if (schedState.status === 'locked_before') {
+            actionHtml = `<span class="bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4"></i> Sudah Dikerjakan</span>`;
+          } else if (sched.state === 'locked_before') {
             actionHtml = `
-              <button type="button" onclick="showNotify('Ujian Belum Dibuka', 'Soal asesmen ini masih terkunci dan baru dapat dikerjakan pada jadwal:\\n${window.formatScheduleLabel(ex.startTime)}', true)" class="bg-slate-200 text-slate-600 border border-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed shrink-0">
-                <i data-lucide="lock" class="w-4 h-4 text-amber-600"></i> Terkunci (Belum Jadwal)
-              </button>`;
-          } else if (schedState.status === 'locked_after') {
+              <div class="flex flex-col items-stretch sm:items-end gap-1">
+                <span class="bg-slate-200 text-slate-600 font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-slate-300 cursor-not-allowed select-none">
+                  <i data-lucide="lock" class="w-4 h-4 text-amber-600"></i> Terkunci (Belum Jadwal)
+                </span>
+                <span class="text-[10px] font-bold text-amber-700 text-center sm:text-right">${sched.label}</span>
+              </div>`;
+          } else if (sched.state === 'locked_after') {
             actionHtml = `
-              <span class="bg-rose-100 text-rose-700 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shrink-0">
-                <i data-lucide="lock" class="w-4 h-4"></i> Jadwal Berakhir
-              </span>`;
+              <div class="flex flex-col items-stretch sm:items-end gap-1">
+                <span class="bg-rose-100 text-rose-700 font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-rose-200 cursor-not-allowed select-none">
+                  <i data-lucide="lock" class="w-4 h-4"></i> Jadwal Berakhir
+                </span>
+                <span class="text-[10px] font-semibold text-rose-600 text-center sm:text-right">${sched.label}</span>
+              </div>`;
+          } else if (savedProg) {
+            actionHtml = `
+              <div class="flex flex-col items-stretch sm:items-end gap-1">
+                <button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation">
+                  <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Lanjutkan Ujian
+                </button>
+                <span class="text-[10px] font-bold text-emerald-700 text-center sm:text-right">Tersimpan: ${answeredCount}/${ex.questions.length} soal</span>
+              </div>`;
           } else {
-            actionHtml = `
-              <button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation shrink-0">
-                <i data-lucide="play" class="w-4 h-4 text-amber-400"></i> Mulai Ujian
-              </button>`;
+            actionHtml = `<button onclick="startStudentExam('${ex.id}', '${selectedStudentId}', '${selectedName.replace(/'/g, "\\'")}', '${selectedClass}')" class="bg-brand-navy hover:bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow touch-manipulation">
+              <i data-lucide="play" class="w-4 h-4 text-amber-400"></i> Mulai Ujian
+            </button>`;
           }
 
           return `
-            <div class="bg-white p-4 rounded-xl border ${schedState.status !== 'open' && !alreadyDone ? 'border-slate-200 bg-slate-50/60' : 'border-slate-200 hover:border-brand-gold'} shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 hover:border-brand-gold shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
               <div>
-                <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded">${ex.subject}</span>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded">${ex.subject}</span>
+                  ${ex.startTime ? `<span class="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3 text-brand-gold"></i> ${formatScheduleDisplay(ex.startTime)}</span>` : ''}
+                </div>
                 <h4 class="font-bold text-slate-900 text-sm mt-1.5">${ex.title}</h4>
                 <p class="text-xs text-slate-500 mt-0.5">Durasi: ${ex.duration} Menit | Jumlah: ${ex.questions.length} Soal</p>
-                ${scheduleMetaHtml}
               </div>
               ${actionHtml}
             </div>
@@ -1851,28 +1946,43 @@
         return;
       }
 
-      const schedState = window.getExamScheduleState(exam);
-      if (schedState.status === 'locked_before') {
-        showNotify('Ujian Terkunci', `Asesmen ini baru dapat dimulai pada jadwal:\n${window.formatScheduleLabel(exam.startTime)}`, true);
+      const sched = getExamScheduleState(exam);
+      if (sched.state === 'locked_before') {
+        showNotify('Ujian Belum Dibuka', `Asesmen ini terkunci dan baru dapat dikerjakan pada jadwal:\n${formatScheduleDisplay(exam.startTime)}`, true);
         loadAvailableExamsForStudent();
         return;
       }
-      if (schedState.status === 'locked_after') {
-        showNotify('Jadwal Berakhir', `Waktu pelaksanaan asesmen ini telah berakhir pada:\n${window.formatScheduleLabel(exam.endTime)}`, true);
+      if (sched.state === 'locked_after') {
+        showNotify('Waktu Ujian Berakhir', `Batas waktu pelaksanaan asesmen ini telah berakhir pada:\n${formatScheduleDisplay(exam.endTime)}`, true);
         loadAvailableExamsForStudent();
         return;
       }
 
       window.SAS_APP.activeExam = exam;
       window.SAS_APP.userProfile = { id: studentId, name: studentName, class: studentClass, role: 'siswa' };
-      window.SAS_APP.examAnswers = {};
-      window.SAS_APP.examDoubts = {};
-      window.SAS_APP.currentQuestionIdx = 0;
+
+      const savedProg = window.getSavedExamProgress(examId, studentId);
+      let initialSeconds = exam.duration * 60;
+
+      if (savedProg) {
+        window.SAS_APP.examAnswers = savedProg.examAnswers || {};
+        window.SAS_APP.examDoubts = savedProg.examDoubts || {};
+        const maxIdx = Math.max(0, exam.questions.length - 1);
+        window.SAS_APP.currentQuestionIdx = Math.min(savedProg.currentQuestionIdx || 0, maxIdx);
+        if (typeof savedProg.timeLeft === 'number' && savedProg.timeLeft > 0) {
+          initialSeconds = savedProg.timeLeft;
+        }
+      } else {
+        window.SAS_APP.examAnswers = {};
+        window.SAS_APP.examDoubts = {};
+        window.SAS_APP.currentQuestionIdx = 0;
+      }
 
       document.getElementById('exam-mode-title').innerText = `${exam.subject} - Kelas ${studentClass}`;
       document.getElementById('exam-mode-student').innerText = `Peserta: ${studentName}`;
 
-      startExamTimer(exam.duration * 60);
+      startExamTimer(initialSeconds);
+      window.saveCurrentExamProgress();
 
       switchView('exam-mode-view');
       renderCurrentQuestion();
@@ -1887,6 +1997,10 @@
       window.SAS_APP.examTimer = setInterval(() => {
         window.SAS_APP.timeLeft--;
         updateTimerDisplay();
+
+        if (window.SAS_APP.timeLeft % 5 === 0) {
+          window.saveCurrentExamProgress();
+        }
 
         if (window.SAS_APP.timeLeft <= 0) {
           clearInterval(window.SAS_APP.examTimer);
@@ -1907,29 +2021,45 @@
       if (mobileEl) mobileEl.innerText = formatted;
     }
 
+    function formatArabicTextHtml(rawText) {
+      if (!rawText) return '';
+      const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(rawText);
+      if (!hasArabic) return rawText;
+      const lines = rawText.split(/<br\s*\/?>|\n/i);
+      return lines.map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '';
+        const arabicChars = (trimmed.match(/[\u0600-\u06FF]/g) || []).length;
+        const latinChars = (trimmed.match(/[A-Za-z]/g) || []).length;
+        if (arabicChars > 0 && arabicChars >= latinChars) {
+          return `<span class="arabic-rtl" dir="rtl">${trimmed}</span>`;
+        }
+        return `<span class="arabic-aware" dir="auto">${trimmed}</span>`;
+      }).join('<br>');
+    }
+
     function renderCurrentQuestion() {
       const exam = window.SAS_APP.activeExam;
       const idx = window.SAS_APP.currentQuestionIdx;
       const question = exam.questions[idx];
 
       document.getElementById('current-question-num').innerText = `${idx + 1} / ${exam.questions.length}`;
-      const formattedQuestion = formatRichExamText(question.question);
-      const isMainArabic = isDominantArabic(question.question);
-      const qTextEl = document.getElementById('question-text');
-      qTextEl.innerHTML = `<div class="flex items-start gap-2"><span class="shrink-0 font-extrabold">${idx + 1}.</span><div class="flex-1 ${isMainArabic ? 'arabic-rtl' : 'arabic-aware'}">${formattedQuestion}</div></div>`;
+      const qImgHtml = question.image ? `<img src="${question.image}" alt="Gambar Soal ${idx + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">` : '';
+      document.getElementById('question-text').innerHTML = `<div class="arabic-aware">${idx + 1}. ${formatArabicTextHtml(question.question)}</div>${qImgHtml}`;
 
       const optionsContainer = document.getElementById('options-container');
       const selectedAnswer = window.SAS_APP.examAnswers[idx];
 
       optionsContainer.innerHTML = ['A', 'B', 'C', 'D'].map(key => {
         const value = question.options[key] || '-';
+        const optImg = question.optionImages && question.optionImages[key]
+          ? `<img src="${question.optionImages[key]}" alt="Gambar Opsi ${key}" class="mt-1.5 max-h-36 rounded-lg border border-slate-200 bg-white object-contain">`
+          : '';
         const isChecked = selectedAnswer === key;
-        const optIsArabic = isDominantArabic(value);
-        const formattedOpt = formatRichExamText(value);
         return `
-          <button type="button" onclick="selectOption('${key}')" class="w-full text-left option-btn-touch flex items-center space-x-3.5 p-3.5 rounded-xl border transition active:scale-[0.99] ${isChecked ? 'bg-amber-100 border-amber-500 font-bold ring-2 ring-amber-400' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}">
-            <span class="w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 ${isChecked ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">${key}</span>
-            <span class="flex-1 text-sm sm:text-base text-slate-900 leading-snug option-rich-content ${optIsArabic ? 'arabic-rtl' : 'arabic-aware'}">${formattedOpt}</span>
+          <button type="button" onclick="selectOption('${key}')" class="w-full text-left option-btn-touch flex items-start space-x-3.5 p-3.5 rounded-xl border transition active:scale-[0.99] ${isChecked ? 'bg-amber-100 border-amber-500 font-bold ring-2 ring-amber-400' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}">
+            <span class="w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 mt-0.5 ${isChecked ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">${key}</span>
+            <div class="flex-1 text-sm sm:text-base text-slate-900 leading-snug arabic-aware option-rich-content">${formatArabicTextHtml(value)}${optImg}</div>
           </button>
         `;
       }).join('');
@@ -1939,18 +2069,26 @@
       document.getElementById('btn-next-question').disabled = idx === exam.questions.length - 1;
     }
 
-    window.selectOption = function(optKey) {
+    window.selectOption = function(key) {
       const idx = window.SAS_APP.currentQuestionIdx;
-      window.SAS_APP.examAnswers[idx] = optKey;
+      window.SAS_APP.examAnswers[idx] = key;
+      window.saveCurrentExamProgress();
       renderCurrentQuestion();
       renderQuestionGrid();
     };
 
-    window.navigateQuestion = function(delta) {
-      const exam = window.SAS_APP.activeExam;
-      const newIdx = window.SAS_APP.currentQuestionIdx + delta;
-      if (newIdx >= 0 && newIdx < exam.questions.length) {
+    window.toggleDoubtState = function() {
+      const idx = window.SAS_APP.currentQuestionIdx;
+      window.SAS_APP.examDoubts[idx] = document.getElementById('doubt-checkbox').checked;
+      window.saveCurrentExamProgress();
+      renderQuestionGrid();
+    };
+
+    window.navigateQuestion = function(direction) {
+      const newIdx = window.SAS_APP.currentQuestionIdx + direction;
+      if (newIdx >= 0 && newIdx < window.SAS_APP.activeExam.questions.length) {
         window.SAS_APP.currentQuestionIdx = newIdx;
+        window.saveCurrentExamProgress();
         renderCurrentQuestion();
         renderQuestionGrid();
       }
@@ -1958,162 +2096,118 @@
 
     window.jumpToQuestion = function(idx) {
       window.SAS_APP.currentQuestionIdx = idx;
+      window.saveCurrentExamProgress();
       renderCurrentQuestion();
       renderQuestionGrid();
-      const sidebar = document.getElementById('question-grid-sidebar');
-      if (sidebar && !sidebar.classList.contains('hidden') && window.innerWidth < 1024) {
-        sidebar.classList.add('hidden');
+      if (window.innerWidth < 1024) {
+        document.getElementById('question-grid-sidebar').classList.add('hidden');
       }
     };
 
-    window.toggleDoubtState = function() {
-      const idx = window.SAS_APP.currentQuestionIdx;
-      const checked = document.getElementById('doubt-checkbox').checked;
-      if (checked) {
-        window.SAS_APP.examDoubts[idx] = true;
-      } else {
-        delete window.SAS_APP.examDoubts[idx];
-      }
-      renderQuestionGrid();
+    window.toggleMobileQuestionGrid = function() {
+      document.getElementById('question-grid-sidebar').classList.toggle('hidden');
     };
 
     function renderQuestionGrid() {
       const exam = window.SAS_APP.activeExam;
-      const grid = document.getElementById('question-grid');
-      if (!exam || !grid) return;
+      const gridContainer = document.getElementById('question-grid');
 
-      grid.innerHTML = exam.questions.map((q, idx) => {
-        const isCurrent = idx === window.SAS_APP.currentQuestionIdx;
-        const isAnswered = !!window.SAS_APP.examAnswers[idx];
-        const isDoubt = !!window.SAS_APP.examDoubts[idx];
+      gridContainer.innerHTML = exam.questions.map((q, idx) => {
+        const isAnswered = window.SAS_APP.examAnswers[idx] !== undefined;
+        const isDoubt = window.SAS_APP.examDoubts[idx];
+        const isCurrent = window.SAS_APP.currentQuestionIdx === idx;
 
-        let btnClass = 'bg-slate-200 text-slate-700 border-slate-300';
-        if (isDoubt) {
-          btnClass = 'bg-amber-500 text-white border-amber-600';
-        } else if (isAnswered) {
-          btnClass = 'bg-emerald-600 text-white border-emerald-700';
-        }
+        let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+        if (isDoubt) badgeClass = 'bg-amber-500 text-white font-bold';
+        else if (isAnswered) badgeClass = 'bg-emerald-600 text-white font-bold';
 
-        const ringClass = isCurrent ? 'ring-2 ring-offset-1 ring-slate-900 scale-105' : '';
+        if (isCurrent) badgeClass += ' ring-2 ring-slate-900 ring-offset-1';
 
         return `
-          <button type="button" onclick="jumpToQuestion(${idx})" class="h-9 rounded-lg border font-extrabold text-xs flex items-center justify-center transition ${btnClass} ${ringClass}">
+          <button onclick="jumpToQuestion(${idx})" class="w-9 h-9 rounded-lg text-xs flex items-center justify-center border transition ${badgeClass}">
             ${idx + 1}
           </button>
         `;
       }).join('');
     }
 
-    window.toggleMobileQuestionGrid = function() {
-      const sidebar = document.getElementById('question-grid-sidebar');
-      if (sidebar) {
-        sidebar.classList.toggle('hidden');
-      }
-    };
-
     window.submitExam = async function(isAutoTimeout = false) {
       clearInterval(window.SAS_APP.examTimer);
-      const exam = window.SAS_APP.activeExam;
-      const profile = window.SAS_APP.userProfile;
-      if (!exam || !profile) return;
 
+      const exam = window.SAS_APP.activeExam;
+      const answers = { ...window.SAS_APP.examAnswers };
       let correctCount = 0;
-      const totalQuestions = exam.questions.length;
 
       exam.questions.forEach((q, idx) => {
-        if (window.SAS_APP.examAnswers[idx] === q.answer) {
+        if (answers[idx] === q.answer) {
           correctCount++;
         }
       });
 
-      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-      const nowStr = new Date().toLocaleDateString('id-ID') + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const score = Math.round((correctCount / exam.questions.length) * 100);
+
+      const resultObj = {
+        examId: exam.id,
+        examTitle: exam.title,
+        studentId: window.SAS_APP.userProfile.id,
+        studentName: window.SAS_APP.userProfile.name,
+        studentClass: window.SAS_APP.userProfile.class,
+        subject: exam.subject,
+        score: score,
+        correctCount: correctCount,
+        totalQuestions: exam.questions.length,
+        studentAnswers: answers,
+        completedAt: new Date().toLocaleString('id-ID')
+      };
 
       try {
-        await window.DB_SERVICE.submitExamResult({
-          examId: exam.id,
-          examTitle: exam.title,
-          studentId: profile.id,
-          studentName: profile.name,
-          studentClass: profile.class,
-          subject: exam.subject,
-          score,
-          correctCount,
-          totalQuestions,
-          studentAnswers: { ...window.SAS_APP.examAnswers },
-          completedAt: nowStr
-        });
-
+        await window.DB_SERVICE.submitExamResult(resultObj);
+        window.clearSavedExamProgress(exam.id, window.SAS_APP.userProfile.id);
         window.SAS_APP.activeExam = null;
-        window.SAS_APP.examAnswers = {};
-        window.SAS_APP.examDoubts = {};
 
+        const prefix = isAutoTimeout ? 'Waktu Habis! Jawaban otomatis dikirim.\n\n' : '';
+        showNotify(
+          'Ujian Selesai!',
+          `${prefix}Peserta: ${resultObj.studentName}\nNilai Akhir: ${score} / 100\nJawaban Benar: ${correctCount} dari ${exam.questions.length} soal.`
+        );
         switchView('home-view');
         loadAvailableExamsForStudent();
-
-        showNotify(
-          isAutoTimeout ? 'Waktu Ujian Habis!' : 'Ujian Selesai & Terkirim!',
-          `Terima kasih ${profile.name}.\nJawaban Anda telah berhasil disimpan ke sistem.`
-        );
       } catch (err) {
         showNotify('Gagal Mengirim Jawaban', err.message, true);
       }
     };
 
-    function compressBase64Image(dataUri, maxWidth = 680, quality = 0.78) {
+    function compressBase64Image(dataUrl, maxWidth = 680, quality = 0.72) {
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = function() {
-          let w = img.width;
-          let h = img.height;
-          if (w > maxWidth) {
-            h = Math.round((h * maxWidth) / w);
-            w = maxWidth;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
+          canvas.width = width;
+          canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
           resolve(canvas.toDataURL('image/jpeg', quality));
         };
         img.onerror = function() {
-          resolve(dataUri);
+          resolve(dataUrl);
         };
-        img.src = dataUri;
+        img.src = dataUrl;
       });
-    }
-
-    function isDominantArabic(htmlOrText) {
-      if (!htmlOrText) return false;
-      const plain = String(htmlOrText).replace(/<[^>]*>/g, '').trim();
-      if (!plain) return false;
-      const arabicChars = (plain.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) || []).length;
-      const latinChars = (plain.match(/[A-Za-z]/g) || []).length;
-      return arabicChars > 0 && arabicChars >= latinChars;
-    }
-
-    function formatRichExamText(content) {
-      if (!content) return '-';
-      const parts = String(content).split(/(<img[^>]+>)/gi);
-      return parts.map(part => {
-        if (/^<img/i.test(part)) return part;
-        const trimmed = part.trim();
-        if (!trimmed) return '';
-        if (isDominantArabic(trimmed)) {
-          return `<span class="arabic-rtl my-1">${trimmed}</span>`;
-        }
-        return part;
-      }).join(' ');
     }
 
     window.processDocxImport = function(inputElement) {
       const file = inputElement.files[0];
       if (!file) return;
 
-      document.getElementById('file-name-display').innerText = `Memproses file (teks, Arab & gambar): ${file.name}...`;
+      document.getElementById('file-name-display').innerText = `Memproses file: ${file.name}...`;
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -2121,9 +2215,9 @@
         const options = {
           convertImage: mammoth.images.imgElement(function(image) {
             return image.read("base64").then(async function(imageBuffer) {
-              const rawUri = "data:" + image.contentType + ";base64," + imageBuffer;
-              const compressedUri = await compressBase64Image(rawUri);
-              return { src: compressedUri };
+              const rawSrc = `data:${image.contentType};base64,${imageBuffer}`;
+              const compressedSrc = await compressBase64Image(rawSrc);
+              return { src: compressedSrc };
             });
           })
         };
@@ -2140,72 +2234,77 @@
       reader.readAsArrayBuffer(file);
     };
 
-    function sanitizeInnerRichHtml(htmlStr) {
-      const temp = document.createElement('div');
-      temp.innerHTML = htmlStr;
-      temp.querySelectorAll('script, style, iframe, object').forEach(el => el.remove());
-      temp.querySelectorAll('*').forEach(el => {
-        if (el.tagName === 'IMG') {
-          const src = el.getAttribute('src') || '';
-          Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
-          if (src.startsWith('data:image/')) el.setAttribute('src', src);
-        } else {
-          Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+    function parseDocxHtmlContent(htmlString) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlString;
+
+      const blocks = [];
+      tempDiv.querySelectorAll('p, li, tr').forEach(el => {
+        if (el.tagName === 'TR') {
+          const text = el.textContent.trim();
+          const imgs = Array.from(el.querySelectorAll('img')).map(i => i.src);
+          if (text || imgs.length) blocks.push({ text, imgs });
+          return;
         }
-      });
-      return temp.innerHTML.trim();
-    }
-
-    function parseDocxHtmlContent(html) {
-      const container = document.createElement('div');
-      container.innerHTML = html;
-
-      // Pecah blok paragraf / baris tabel / list item agar urutan teks & gambar terjaga
-      const rawBlocks = [];
-      container.querySelectorAll('p, li, h1, h2, h3, h4, td').forEach(node => {
-        if (node.tagName === 'TD' && node.querySelector('p, li')) return;
-        const cleanHtml = sanitizeInnerRichHtml(node.innerHTML);
-        const plainText = (node.textContent || '').replace(/\u00A0/g, ' ').trim();
-        const hasImg = /<img\s/i.test(cleanHtml);
-        if (plainText.length > 0 || hasImg) {
-          rawBlocks.push({ html: cleanHtml, text: plainText, hasImg });
+        if (el.closest('td, th')) return;
+        const text = el.textContent.replace(/\s+/g, ' ').trim();
+        const imgs = Array.from(el.querySelectorAll('img')).map(i => i.src);
+        if (text || imgs.length > 0) {
+          blocks.push({ text, imgs });
         }
       });
 
       parsedDocxQuestions = [];
       let currentQ = null;
-      let lastTarget = null; // 'question' | 'A' | 'B' | 'C' | 'D'
+      let lastTarget = 'question';
+      let lastOptionKey = null;
 
-      rawBlocks.forEach(block => {
-        const plain = block.text;
-        const qMatch = plain.match(/^(\d+)[\.\)]\s*(.*)/s);
-        const optMatch = plain.match(/^([A-D])[\.\)]\s*(.*)/is);
-        const keyMatch = plain.match(/^(?:kunci|jawaban|kunci jawaban)[\s:]*([A-D])/i);
+      blocks.forEach(block => {
+        const line = block.text;
+        const imgs = block.imgs;
+
+        const qMatch = line.match(/^(\d+)[\.\)]\s*(.*)/);
+        const optMatch = line.match(/^([A-D])[\.\)]\s*(.*)/i);
+        const keyMatch = line.match(/^(kunci|jawaban|kunci jawaban)[\s:]*([A-D])/i);
 
         if (qMatch) {
           if (currentQ) parsedDocxQuestions.push(currentQ);
-          const strippedHtml = block.html.replace(/^\s*(?:<[^>]+>)*\s*\d+[\.\)]\s*/i, '').trim();
           currentQ = {
             id: parseInt(qMatch[1]),
-            question: strippedHtml || qMatch[2],
+            question: qMatch[2].trim(),
+            image: imgs[0] || '',
             options: {},
+            optionImages: {},
             answer: 'A'
           };
           lastTarget = 'question';
+          lastOptionKey = null;
         } else if (optMatch && currentQ) {
           const optKey = optMatch[1].toUpperCase();
-          const strippedOptHtml = block.html.replace(/^\s*(?:<[^>]+>)*\s*[A-D][\.\)]\s*/i, '').trim();
-          currentQ.options[optKey] = strippedOptHtml || optMatch[2];
-          lastTarget = optKey;
+          currentQ.options[optKey] = optMatch[2].trim();
+          if (imgs[0]) {
+            currentQ.optionImages[optKey] = imgs[0];
+          }
+          lastTarget = 'option';
+          lastOptionKey = optKey;
         } else if (keyMatch && currentQ) {
-          currentQ.answer = keyMatch[1].toUpperCase();
-          lastTarget = null;
+          currentQ.answer = keyMatch[2].toUpperCase();
+          lastTarget = 'key';
+          lastOptionKey = null;
         } else if (currentQ) {
-          // Lanjutan paragraf atau gambar yang berada di bawah soal / di bawah opsi A-D
-          if (lastTarget && ['A', 'B', 'C', 'D'].includes(lastTarget)) {
-            currentQ.options[lastTarget] = (currentQ.options[lastTarget] || '') + '<br>' + block.html;
-          } else {
-            currentQ.question += '<br>' + block.html;
+          if (line) {
+            if (lastTarget === 'option' && lastOptionKey) {
+              currentQ.options[lastOptionKey] = `${currentQ.options[lastOptionKey]} ${line}`.trim();
+            } else if (lastTarget === 'question') {
+              currentQ.question = `${currentQ.question} ${line}`.trim();
+            }
+          }
+          if (imgs.length > 0) {
+            if (lastTarget === 'option' && lastOptionKey && !currentQ.optionImages[lastOptionKey]) {
+              currentQ.optionImages[lastOptionKey] = imgs[0];
+            } else if (!currentQ.image) {
+              currentQ.image = imgs[0];
+            }
           }
         }
       });
@@ -2225,12 +2324,13 @@
 
       container.innerHTML = parsedDocxQuestions.map((q, idx) => `
         <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
-          <div class="font-bold text-slate-900 exam-rich-content arabic-aware">${idx + 1}. ${formatRichExamText(q.question)}</div>
+          <div class="font-bold text-slate-900 arabic-aware">${idx + 1}. ${formatArabicTextHtml(q.question)}</div>
+          ${q.image ? `<img src="${q.image}" alt="Gambar Soal ${idx + 1}" class="max-h-36 rounded-lg border border-slate-200 object-contain">` : ''}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-600 pl-2">
-            <div class="option-rich-content arabic-aware"><b>A.</b> ${formatRichExamText(q.options.A || '-')}</div>
-            <div class="option-rich-content arabic-aware"><b>B.</b> ${formatRichExamText(q.options.B || '-')}</div>
-            <div class="option-rich-content arabic-aware"><b>C.</b> ${formatRichExamText(q.options.C || '-')}</div>
-            <div class="option-rich-content arabic-aware"><b>D.</b> ${formatRichExamText(q.options.D || '-')}</div>
+            <div class="arabic-aware"><b>A.</b> ${formatArabicTextHtml(q.options.A || '-')} ${q.optionImages?.A ? `<img src="${q.optionImages.A}" class="max-h-20 mt-1 rounded border">` : ''}</div>
+            <div class="arabic-aware"><b>B.</b> ${formatArabicTextHtml(q.options.B || '-')} ${q.optionImages?.B ? `<img src="${q.optionImages.B}" class="max-h-20 mt-1 rounded border">` : ''}</div>
+            <div class="arabic-aware"><b>C.</b> ${formatArabicTextHtml(q.options.C || '-')} ${q.optionImages?.C ? `<img src="${q.optionImages.C}" class="max-h-20 mt-1 rounded border">` : ''}</div>
+            <div class="arabic-aware"><b>D.</b> ${formatArabicTextHtml(q.options.D || '-')} ${q.optionImages?.D ? `<img src="${q.optionImages.D}" class="max-h-20 mt-1 rounded border">` : ''}</div>
           </div>
           <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded">Kunci Jawaban: ${q.answer}</span>
         </div>
@@ -2243,16 +2343,16 @@
       const subject = document.getElementById('exam-input-subject').value;
       const targetClass = document.getElementById('exam-input-class').value;
       const duration = parseInt(document.getElementById('exam-input-duration').value);
-      const startTime = document.getElementById('exam-input-start-time').value || '';
-      const endTime = document.getElementById('exam-input-end-time').value || '';
-
-      if (startTime && endTime && new Date(endTime) <= new Date(startTime)) {
-        showNotify('Jadwal Tidak Valid', 'Waktu batas akhir ujian harus lebih lambat dari waktu mulai ujian.', true);
-        return;
-      }
+      const startTime = document.getElementById('exam-input-start-time').value;
+      const endTime = document.getElementById('exam-input-end-time').value;
 
       if (parsedDocxQuestions.length === 0) {
         showNotify('Soal Kosong', 'Harap unggah file .docx yang berisi soal terlebih dahulu!', true);
+        return;
+      }
+
+      if (startTime && endTime && new Date(endTime) <= new Date(startTime)) {
+        showNotify('Jadwal Tidak Valid', 'Batas akhir ujian harus lebih lambat daripada jadwal mulai ujian.', true);
         return;
       }
 
@@ -2266,8 +2366,8 @@
           subject,
           targetClass,
           duration,
-          startTime,
-          endTime,
+          startTime: startTime || '',
+          endTime: endTime || '',
           status: 'aktif',
           createdBy: window.SAS_APP.currentUser?.username || 'admin',
           createdAt: new Date().toISOString(),
@@ -2280,7 +2380,8 @@
         document.getElementById('parsed-questions-list').innerHTML = '<div class="text-center py-6 text-xs text-slate-400">Belum ada file terunggah.</div>';
         document.getElementById('parsed-questions-count').innerText = '0 Soal';
 
-        showNotify('Berhasil Disimpan', `Paket ujian "${title}" untuk Kelas ${targetClass} berhasil diterbitkan.`);
+        const infoJadwal = startTime ? `\nJadwal Mulai: ${formatScheduleDisplay(startTime)}` : '\nJadwal: Terbuka langsung';
+        showNotify('Berhasil Disimpan', `Paket ujian "${title}" untuk Kelas ${targetClass} berhasil diterbitkan.${infoJadwal}`);
         switchView('dashboard-view');
       } catch (err) {
         showNotify('Gagal Menyimpan Ujian', err.message, true);
@@ -2409,28 +2510,36 @@
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Belum ada paket ujian terdaftar. Klik tombol "Import Word (.docx)" untuk menambahkan soal.</td></tr>`;
       } else {
         tbody.innerHTML = exams.map(ex => {
-          const schedInfo = ex.startTime
-            ? `<span class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg inline-block">${window.formatScheduleLabel(ex.startTime)}</span>`
-            : `<span class="text-[11px] text-slate-500">Bebas / Langsung</span>`;
+          const sched = getExamScheduleState(ex);
+          let schedBadge = `<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Bebas / Terbuka</span>`;
+          if (ex.startTime) {
+            schedBadge = `
+              <div class="text-[10px] leading-snug">
+                <span class="font-bold ${sched.state === 'locked_before' ? 'text-amber-700' : 'text-slate-700'} block">Mulai: ${formatScheduleDisplay(ex.startTime)}</span>
+                ${ex.endTime ? `<span class="text-slate-500 block">Selesai: ${formatScheduleDisplay(ex.endTime)}</span>` : ''}
+              </div>
+            `;
+          }
+
           return `
-          <tr class="hover:bg-slate-50">
-            <td class="py-3 px-4 font-bold text-slate-900">${ex.title}</td>
-            <td class="py-3 px-4">${ex.subject}</td>
-            <td class="py-3 px-4"><span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded">Kelas ${ex.targetClass}</span></td>
-            <td class="py-3 px-4">${ex.duration} Mnt</td>
-            <td class="py-3 px-4">${schedInfo}</td>
-            <td class="py-3 px-4">${ex.questions?.length || 0} Soal</td>
-            <td class="py-3 px-4">
-              <button onclick="handleToggleExamStatus('${ex.id}', '${ex.status}')" class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase transition ${ex.status === 'aktif' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}">
-                ${ex.status}
-              </button>
-            </td>
-            <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
-              <button onclick="openScheduleModal('${ex.id}')" class="text-amber-700 hover:text-amber-900 font-bold">Jadwal</button>
-              <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${ex.title} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
-            </td>
-          </tr>
-        `;
+            <tr class="hover:bg-slate-50">
+              <td class="py-3 px-4 font-bold text-slate-900">${ex.title}</td>
+              <td class="py-3 px-4">${ex.subject}</td>
+              <td class="py-3 px-4"><span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded">Kelas ${ex.targetClass}</span></td>
+              <td class="py-3 px-4">${ex.duration} Mnt</td>
+              <td class="py-3 px-4">${schedBadge}</td>
+              <td class="py-3 px-4">${ex.questions?.length || 0} Soal</td>
+              <td class="py-3 px-4">
+                <button onclick="handleToggleExamStatus('${ex.id}', '${ex.status}')" class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase transition ${ex.status === 'aktif' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}">
+                  ${ex.status}
+                </button>
+              </td>
+              <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+                <button onclick="openScheduleModal('${ex.id}')" class="text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200">Jadwal</button>
+                <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${ex.title} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+              </td>
+            </tr>
+          `;
         }).join('');
       }
     };
@@ -2458,11 +2567,11 @@
     window.handleUpdateSchedule = async function(e) {
       e.preventDefault();
       const examId = document.getElementById('schedule-exam-id').value;
-      const startTime = document.getElementById('schedule-input-start').value || '';
-      const endTime = document.getElementById('schedule-input-end').value || '';
+      const startTime = document.getElementById('schedule-input-start').value;
+      const endTime = document.getElementById('schedule-input-end').value;
 
       if (startTime && endTime && new Date(endTime) <= new Date(startTime)) {
-        showNotify('Jadwal Tidak Valid', 'Batas akhir ujian harus lebih lambat dari waktu mulai ujian.', true);
+        showNotify('Jadwal Tidak Valid', 'Batas akhir ujian harus lebih lambat daripada waktu mulai ujian.', true);
         return;
       }
 
@@ -2474,7 +2583,7 @@
         await window.DB_SERVICE.updateExamSchedule(examId, startTime, endTime);
         closeScheduleModal();
         renderDashboard();
-        showNotify('Jadwal Diperbarui', startTime ? `Ujian dikunci hingga jadwal mulai: ${window.formatScheduleLabel(startTime)}` : 'Kunci jadwal dilepas. Ujian dapat langsung dikerjakan.');
+        showNotify('Jadwal Diperbarui', startTime ? `Ujian terkunci hingga ${formatScheduleDisplay(startTime)}.` : 'Kunci jadwal dibuka. Ujian dapat langsung dikerjakan siswa.');
       } catch (err) {
         showNotify('Gagal Menyimpan Jadwal', err.message, true);
       } finally {
@@ -3093,6 +3202,14 @@
       await window.DB_SERVICE.deleteStudent(id, cls);
       renderUsersManagement();
     };
+
+    window.addEventListener('beforeunload', function(e) {
+      if (window.SAS_APP && window.SAS_APP.activeExam) {
+        window.saveCurrentExamProgress();
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   </script>
 </body>
 </html>

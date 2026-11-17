@@ -2394,13 +2394,11 @@
           if (tag === 'LI') {
             const currentIndex = listContext ? listContext.index++ : 1;
             const imgs = Array.from(el.querySelectorAll(':scope > img, :scope > p img, :scope > span img')).map(i => i.src);
-            // Ambil teks langsung di dalam LI (tidak termasuk nested OL/UL)
             const liClone = el.cloneNode(true);
             liClone.querySelectorAll('ol, ul').forEach(nested => nested.remove());
             const rawText = normalizeDocxText(extractFormattedTextFromNode(liClone));
 
             if (rawText || imgs.length > 0) {
-              // Deteksi apakah list ini level opsi (A-D) atau level nomor soal (1, 2, 3...)
               const alreadyHasNumber = /^(\d+|soal\s*\d+)[\.\)\:\-\s]/i.test(rawText);
               const alreadyHasOption = /^\(?([A-D]|[أابجدهـ])[\.\)\:\-\s]/i.test(rawText);
 
@@ -2417,7 +2415,6 @@
               blocks.push({ text: prefixedText, imgs });
             }
 
-            // Telusuri sub-list bersarang (misal opsi A-D dibuat menggunakan multilevel numbering Word)
             Array.from(el.children).forEach(child => {
               if (child.tagName === 'OL' || child.tagName === 'UL') {
                 const subStart = parseInt(child.getAttribute('start') || '1', 10);
@@ -2441,14 +2438,12 @@
               if (cells.length === 0) return;
 
               const firstCellText = normalizeDocxText(extractFormattedTextFromNode(cells[0]));
-              // Jika tabel 2 kolom dengan kolom pertama berisi nomor soal (misal: | 1 | Pertanyaan... |)
               if (cells.length >= 2 && /^(\d+)[\.\)]?$/.test(firstCellText)) {
                 const qNum = firstCellText.replace(/[^\d]/g, '');
                 const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
                 const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
                 blocks.push({ text: `${qNum}. ${restText}`, imgs: rowImgs });
               } else if (cells.length >= 2 && /^\(?([A-Dأابجد])[\.\)\:]?$/i.test(firstCellText)) {
-                // Jika tabel 2 kolom dengan kolom pertama hanya huruf opsi (misal: | A. | Jawaban... |)
                 const optChar = firstCellText.replace(/[^A-Dأابجد]/gi, '');
                 const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
                 const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
@@ -2502,7 +2497,6 @@
           expandedBlocks.push(blk);
           return;
         }
-        // Cek apakah terdapat lebih dari satu penanda opsi A. B. C. D. (besar/kecil) dalam satu baris yang sama
         const inlineSplit = txt.split(/(?=\s+\(?[A-Da-dأبجد][\.\)\:]\s+)/);
         if (inlineSplit.length > 1 && /^\(?([A-Da-dأبجد])[\.\)\:]\s*/.test(inlineSplit[0].trim())) {
           inlineSplit.forEach((part, idx) => {
@@ -2522,25 +2516,44 @@
       let currentQ = null;
       let lastTarget = 'question';
       let lastOptionKey = null;
+      let pendingLeadingImages = [];
+
+      // Helper: Jika opsi di Word memakai numbering kustom sehingga Mammoth mengonversinya menjadi paragraf biasa tanpa huruf A-D sebelum "Kunci: X", otomatis tetapkan sebagai A, B, C, D
+      function finalizeQuestionOptions(qObj) {
+        if (!qObj) return;
+        if (Object.keys(qObj.options).length === 0 && qObj.question.includes('<br>')) {
+          const parts = qObj.question.split('<br>').map(p => p.trim()).filter(Boolean);
+          if (parts.length >= 5) {
+            const letters = ['A', 'B', 'C', 'D'];
+            const candidateOpts = parts.slice(-4);
+            qObj.question = parts.slice(0, -4).join('<br>');
+            letters.forEach((ltr, i) => {
+              qObj.options[ltr] = candidateOpts[i];
+            });
+          }
+        }
+      }
 
       expandedBlocks.forEach(block => {
         const line = block.text;
         const imgs = block.imgs || [];
 
-        // Cocokkan pola nomor soal: "1. ...", "1) ...", "1: ...", "1 - ...", "Soal 1. ..."
         const qMatch = line.match(/^(?:soal\s*)?(\d+)\s*[\.\)\:\-]\s*(.*)/i);
-        // Cocokkan pola opsi pilihan ganda: "A. ...", "a) ...", "A: ...", "(A) ...", serta huruf Arab أ ب ج د
         const optMatch = line.match(/^\(?([A-Da-dأابجد])\s*[\.\)\:\-]\s*(.*)/);
-        // Cocokkan pola kunci jawaban: "Kunci: A", "Jawaban : B", "Kunci Jawaban = C", "KJ: D"
         const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]\s*\(?([A-Da-dأابجد])\)?/i);
 
         if (qMatch && !optMatch && !keyMatch) {
-          if (currentQ) parsedDocxQuestions.push(currentQ);
+          if (currentQ) {
+            finalizeQuestionOptions(currentQ);
+            parsedDocxQuestions.push(currentQ);
+          }
+          const combinedImgs = [...pendingLeadingImages, ...imgs];
+          pendingLeadingImages = [];
           currentQ = {
             id: parseInt(qMatch[1], 10),
             question: qMatch[2].trim(),
-            image: imgs[0] || '',
-            images: [...imgs],
+            image: combinedImgs[0] || '',
+            images: combinedImgs,
             options: {},
             optionImages: {},
             answer: 'A'
@@ -2559,43 +2572,39 @@
         } else if (keyMatch && currentQ) {
           const rawKey = keyMatch[1].toUpperCase();
           currentQ.answer = arabicOptMap[rawKey] || rawKey;
+          finalizeQuestionOptions(currentQ);
           lastTarget = 'key';
           lastOptionKey = null;
         } else if (currentQ) {
-          if (line) {
-            if (lastTarget === 'option' && lastOptionKey) {
-              currentQ.options[lastOptionKey] = `${currentQ.options[lastOptionKey]} ${line}`.trim();
-            } else if (lastTarget === 'question') {
-              currentQ.question = currentQ.question ? `${currentQ.question}<br>${line}` : line;
+          if (lastTarget === 'key') {
+            // Jika sudah melewati baris "Kunci: X" dan muncul gambar tanpa teks sebelum nomor soal berikutnya (seperti gambar sebelum soal no. 11), simpan untuk soal berikutnya
+            if (!line && imgs.length > 0) {
+              pendingLeadingImages.push(...imgs);
             }
-          }
-          if (imgs.length > 0) {
-            if (lastTarget === 'option' && lastOptionKey && !currentQ.optionImages[lastOptionKey]) {
-              currentQ.optionImages[lastOptionKey] = imgs[0];
-            } else {
-              if (!currentQ.image) currentQ.image = imgs[0];
-              currentQ.images.push(...imgs);
+          } else {
+            if (line) {
+              if (lastTarget === 'option' && lastOptionKey) {
+                currentQ.options[lastOptionKey] = `${currentQ.options[lastOptionKey]} ${line}`.trim();
+              } else if (lastTarget === 'question') {
+                currentQ.question = currentQ.question ? `${currentQ.question}<br>${line}` : line;
+              }
+            }
+            if (imgs.length > 0) {
+              if (lastTarget === 'option' && lastOptionKey && !currentQ.optionImages[lastOptionKey]) {
+                currentQ.optionImages[lastOptionKey] = imgs[0];
+              } else {
+                if (!currentQ.image) currentQ.image = imgs[0];
+                currentQ.images.push(...imgs);
+              }
             }
           }
         }
       });
 
-      if (currentQ) parsedDocxQuestions.push(currentQ);
-
-      // Cadangan otomatis jika soal memakai bullet list (<ul>/<li>) tanpa huruf A-D
-      parsedDocxQuestions.forEach(q => {
-        if (Object.keys(q.options).length === 0 && q.question.includes('<br>')) {
-          const parts = q.question.split('<br>').map(p => p.trim()).filter(Boolean);
-          if (parts.length >= 5) {
-            const letters = ['A', 'B', 'C', 'D'];
-            const candidateOpts = parts.slice(-4);
-            q.question = parts.slice(0, -4).join('<br>');
-            letters.forEach((ltr, i) => {
-              q.options[ltr] = candidateOpts[i];
-            });
-          }
-        }
-      });
+      if (currentQ) {
+        finalizeQuestionOptions(currentQ);
+        parsedDocxQuestions.push(currentQ);
+      }
 
       renderParsedQuestionsPreview();
     }

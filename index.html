@@ -2500,8 +2500,9 @@
             const isAlphaList = listTypeAttr === 'a' || listTypeAttr === 'A' ||
               (el.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(el.style.listStyleType || ''));
             const itemCount = el.querySelectorAll(':scope > li').length;
-            // Mammoth sering mengonversi daftar huruf Word (A., B., C., D.) menjadi <ol> terpisah tanpa atribut type="A" tepat setelah paragraf soal
+            // Mammoth sering mengonversi daftar huruf/bullet opsi Word (A., B., C., D.) menjadi <ol>/<ul> terpisah tepat setelah paragraf soal
             const treatAsOptionList = isAlphaList ||
+              (tag === 'UL' && insideQuestionBlock && itemCount >= 2 && itemCount <= 5) ||
               (listContext && listContext.parentIsQuestion) ||
               (insideQuestionBlock && itemCount >= 2 && itemCount <= 5 && (isNaN(startAttr) || startAttr === 1));
 
@@ -2655,16 +2656,16 @@
       // Helper: Jika opsi di Word tidak memiliki awalan huruf eksplisit dan terkumpul 4 baris sebelum kunci/soal berikutnya, otomatis petakan ke A, B, C, D
       function finalizeQuestionOptions(qObj) {
         if (!qObj) return;
-        if (Object.keys(qObj.options).length === 0 && qObj.question.includes('<br>')) {
-          const parts = qObj.question.split('<br>').map(p => p.trim()).filter(Boolean);
-          if (parts.length >= 5) {
-            const letters = ['A', 'B', 'C', 'D'];
-            const candidateOpts = parts.slice(-4);
-            qObj.question = parts.slice(0, -4).join('<br>');
-            letters.forEach((ltr, i) => {
-              qObj.options[ltr] = candidateOpts[i];
-            });
-          }
+        const rawLines = qObj.question.split('<br>').map(p => p.trim()).filter(Boolean);
+
+        // Jika opsi belum terisi (karena di Word ditulis tanpa huruf A/B/C/D atau memakai bullet), ambil 4 baris terakhir sebelum "Kunci :" sebagai opsi A, B, C, D
+        if (Object.keys(qObj.options).length === 0 && rawLines.length >= 5) {
+          const letters = ['A', 'B', 'C', 'D'];
+          const candidateOpts = rawLines.slice(-4);
+          qObj.question = rawLines.slice(0, -4).join('<br>');
+          letters.forEach((ltr, i) => {
+            qObj.options[ltr] = candidateOpts[i];
+          });
         }
       }
 

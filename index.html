@@ -2379,7 +2379,15 @@
 
           if (tag === 'OL' || tag === 'UL') {
             const startAttr = parseInt(el.getAttribute('start') || '1', 10);
-            walkNodes(el, { type: tag, index: isNaN(startAttr) ? 1 : startAttr });
+            const listTypeAttr = (el.getAttribute('type') || '').trim();
+            const isAlphaList = listTypeAttr === 'a' || listTypeAttr === 'A' ||
+              (el.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(el.style.listStyleType || ''));
+            walkNodes(el, {
+              type: tag,
+              index: isNaN(startAttr) ? 1 : startAttr,
+              isAlpha: isAlphaList,
+              parentIsQuestion: listContext ? listContext.parentIsQuestion : false
+            });
             return;
           }
 
@@ -2394,12 +2402,12 @@
             if (rawText || imgs.length > 0) {
               // Deteksi apakah list ini level opsi (A-D) atau level nomor soal (1, 2, 3...)
               const alreadyHasNumber = /^(\d+|soal\s*\d+)[\.\)\:\-\s]/i.test(rawText);
-              const alreadyHasOption = /^([A-D]|[أابجدهـ])[\.\)\:\-\s]/i.test(rawText);
+              const alreadyHasOption = /^\(?([A-D]|[أابجدهـ])[\.\)\:\-\s]/i.test(rawText);
 
               let prefixedText = rawText;
               if (!alreadyHasNumber && !alreadyHasOption) {
-                const isNestedOptionList = listContext && listContext.parentIsQuestion && currentIndex >= 1 && currentIndex <= 4;
-                if (isNestedOptionList) {
+                const isOptionLevel = listContext && (listContext.isAlpha || listContext.parentIsQuestion) && currentIndex >= 1 && currentIndex <= 4;
+                if (isOptionLevel) {
                   const letters = ['A', 'B', 'C', 'D'];
                   prefixedText = `${letters[currentIndex - 1]}. ${rawText}`;
                 } else if (listContext && listContext.type === 'OL') {
@@ -2413,9 +2421,13 @@
             Array.from(el.children).forEach(child => {
               if (child.tagName === 'OL' || child.tagName === 'UL') {
                 const subStart = parseInt(child.getAttribute('start') || '1', 10);
+                const subType = (child.getAttribute('type') || '').trim();
+                const isSubAlpha = subType === 'a' || subType === 'A' ||
+                  (child.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(child.style.listStyleType || ''));
                 walkNodes(child, {
                   type: child.tagName,
                   index: isNaN(subStart) ? 1 : subStart,
+                  isAlpha: isSubAlpha,
                   parentIsQuestion: true
                 });
               }
@@ -2428,13 +2440,19 @@
               const cells = Array.from(tr.querySelectorAll('td, th'));
               if (cells.length === 0) return;
 
-              // Jika tabel 2 kolom dengan kolom pertama berisi nomor soal (misal: | 1 | Pertanyaan... |)
               const firstCellText = normalizeDocxText(extractFormattedTextFromNode(cells[0]));
+              // Jika tabel 2 kolom dengan kolom pertama berisi nomor soal (misal: | 1 | Pertanyaan... |)
               if (cells.length >= 2 && /^(\d+)[\.\)]?$/.test(firstCellText)) {
                 const qNum = firstCellText.replace(/[^\d]/g, '');
                 const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
                 const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
                 blocks.push({ text: `${qNum}. ${restText}`, imgs: rowImgs });
+              } else if (cells.length >= 2 && /^\(?([A-Dأابجد])[\.\)\:]?$/i.test(firstCellText)) {
+                // Jika tabel 2 kolom dengan kolom pertama hanya huruf opsi (misal: | A. | Jawaban... |)
+                const optChar = firstCellText.replace(/[^A-Dأابجد]/gi, '');
+                const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
+                const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
+                blocks.push({ text: `${optChar}. ${restText}`, imgs: rowImgs });
               } else {
                 cells.forEach(cell => {
                   const cellPs = cell.querySelectorAll('p, li');
@@ -2476,7 +2494,7 @@
 
       walkNodes(tempDiv);
 
-      // Pecah baris jika beberapa opsi ditulis sejajar dalam 1 baris (misal: "A. 10   B. 20   C. 30   D. 40")
+      // Pecah baris jika beberapa opsi ditulis sejajar dalam 1 baris (misal: "A. 10   B. 20   C. 30   D. 40" atau "a. 10  b. 20")
       const expandedBlocks = [];
       blocks.forEach(blk => {
         const txt = blk.text;
@@ -2484,9 +2502,9 @@
           expandedBlocks.push(blk);
           return;
         }
-        // Cek apakah terdapat lebih dari satu penanda opsi A. B. C. D. dalam satu baris yang sama
-        const inlineSplit = txt.split(/(?=\s+(?:[A-D]|[أبجد])[\.\)]\s+)/);
-        if (inlineSplit.length > 1 && /^([A-D]|[أبجد])[\.\)]\s*/i.test(inlineSplit[0].trim())) {
+        // Cek apakah terdapat lebih dari satu penanda opsi A. B. C. D. (besar/kecil) dalam satu baris yang sama
+        const inlineSplit = txt.split(/(?=\s+\(?[A-Da-dأبجد][\.\)\:]\s+)/);
+        if (inlineSplit.length > 1 && /^\(?([A-Da-dأبجد])[\.\)\:]\s*/.test(inlineSplit[0].trim())) {
           inlineSplit.forEach((part, idx) => {
             expandedBlocks.push({
               text: part.trim(),
@@ -2512,9 +2530,9 @@
         // Cocokkan pola nomor soal: "1. ...", "1) ...", "1: ...", "1 - ...", "Soal 1. ..."
         const qMatch = line.match(/^(?:soal\s*)?(\d+)\s*[\.\)\:\-]\s*(.*)/i);
         // Cocokkan pola opsi pilihan ganda: "A. ...", "a) ...", "A: ...", "(A) ...", serta huruf Arab أ ب ج د
-        const optMatch = line.match(/^\(?([A-Dأابجد])\s*[\.\)\:\-]\s*(.*)/i);
+        const optMatch = line.match(/^\(?([A-Da-dأابجد])\s*[\.\)\:\-]\s*(.*)/);
         // Cocokkan pola kunci jawaban: "Kunci: A", "Jawaban : B", "Kunci Jawaban = C", "KJ: D"
-        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]\s*\(?([A-Dأابجد])\)?/i);
+        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]\s*\(?([A-Da-dأابجد])\)?/i);
 
         if (qMatch && !optMatch && !keyMatch) {
           if (currentQ) parsedDocxQuestions.push(currentQ);
@@ -2563,6 +2581,22 @@
       });
 
       if (currentQ) parsedDocxQuestions.push(currentQ);
+
+      // Cadangan otomatis jika soal memakai bullet list (<ul>/<li>) tanpa huruf A-D
+      parsedDocxQuestions.forEach(q => {
+        if (Object.keys(q.options).length === 0 && q.question.includes('<br>')) {
+          const parts = q.question.split('<br>').map(p => p.trim()).filter(Boolean);
+          if (parts.length >= 5) {
+            const letters = ['A', 'B', 'C', 'D'];
+            const candidateOpts = parts.slice(-4);
+            q.question = parts.slice(0, -4).join('<br>');
+            letters.forEach((ltr, i) => {
+              q.options[ltr] = candidateOpts[i];
+            });
+          }
+        }
+      });
+
       renderParsedQuestionsPreview();
     }
 

@@ -17,9 +17,8 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Mammoth.js CDN untuk Import Word (.docx) -->
+  <!-- Mammoth.js & JSZip CDN untuk Import Word (.docx) lengkap (Gambar, Tabel, Numbering, Matematika, Arab) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <!-- JSZip CDN untuk ekstraksi mendalam OMML Matematika & XML Word bila diperlukan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <!-- Google Fonts: Plus Jakarta Sans & Noto Naskh Arabic / Amiri (Dukungan Tulisan Arab) -->
@@ -297,6 +296,8 @@
       examTimer: null,
       timeLeft: 0,
       currentQuestionIdx: 0,
+      tabViolations: 0,
+      maxTabViolations: 3,
 
       classes: ['3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B'],
       subjects: [
@@ -744,7 +745,7 @@
     <header class="bg-brand-navy text-white sticky top-0 z-40 shadow-md border-b border-slate-800">
       <div class="max-w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         
-        <!-- Logo & Title (Inline SVG agar selalu tajam & terbaca di semua host/browser) -->
+        <!-- Logo & Title -->
         <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" onclick="switchView('home-view')">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-brand-gold to-amber-300 flex items-center justify-center shadow text-brand-navy font-bold shrink-0 border border-amber-200">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" aria-hidden="true">
@@ -1107,7 +1108,7 @@
         <section id="import-view" class="view-section hidden space-y-4 sm:space-y-6">
           <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
             <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 mb-1">Unggah & Import Bank Soal dari Word (.docx)</h2>
-            <p class="text-xs text-slate-500 mb-5">Ekstraksi otomatis Teks Soal, Opsi Jawaban (A–D), dan Kunci Jawaban.</p>
+            <p class="text-xs text-slate-500 mb-5">Ekstraksi otomatis Teks Soal, Opsi Jawaban (A–D), Gambar, Rumus Matematika, Tulisan Arab, dan Kunci Jawaban.</p>
 
             <form id="form-create-exam" onsubmit="handleSaveExam(event)" class="space-y-5">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1156,8 +1157,8 @@
               <!-- Dropzone File Docx -->
               <div class="border-2 border-dashed border-slate-300 hover:border-brand-gold rounded-2xl p-5 sm:p-7 text-center bg-slate-50/70 transition">
                 <i data-lucide="file-text" class="w-9 h-9 text-slate-400 mx-auto mb-2"></i>
-                <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx) — Mendukung Pilihan Ganda, Gambar, Arab & Matematika</p>
-                <p class="text-[11px] text-slate-500 mb-3">Mendukung penomoran otomatis Word, tabel, maupun teks biasa: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
+                <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx) — Mendukung Gambar, Matematika & Tulisan Arab</p>
+                <p class="text-[11px] text-slate-500 mb-3">Format penulisan berurutan: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code> (atau numbering/bullet Word), <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
                 <input type="file" id="docx-file-input" accept=".docx" class="hidden" onchange="processDocxImport(this)">
                 <button type="button" onclick="document.getElementById('docx-file-input').click()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">
                   Pilih File Docx
@@ -1448,6 +1449,30 @@
     </div>
   </div>
 
+  <!-- ==================== OVERLAY PENGAWAS FULLSCREEN & PINDAH TAB UJIAN ==================== -->
+  <div id="exam-security-overlay" class="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border-2 border-rose-500 text-center space-y-5">
+      <div class="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+        <i data-lucide="shield-alert" class="w-9 h-9"></i>
+      </div>
+      <div>
+        <span id="security-violation-badge" class="inline-block bg-rose-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-2">
+          Mode Pengawas Aktif
+        </span>
+        <h3 id="security-overlay-title" class="text-lg sm:text-xl font-extrabold text-slate-900">
+          Layar Penuh Diperlukan
+        </h3>
+        <p id="security-overlay-desc" class="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+          Demi menjaga kejujuran asesmen, ujian wajib dikerjakan dalam mode Layar Penuh dan dilarang berpindah tab atau membuka aplikasi lain.
+        </p>
+      </div>
+      <button type="button" onclick="resumeExamFullscreen()" class="w-full bg-brand-navy hover:bg-slate-800 active:scale-[0.98] text-white font-extrabold py-3.5 px-5 rounded-2xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+        <i data-lucide="maximize" class="w-4 h-4 text-amber-400"></i>
+        <span>Kembali ke Layar Penuh & Lanjutkan Ujian</span>
+      </button>
+    </div>
+  </div>
+
   <!-- ==================== MODAL ATUR JADWAL UJIAN (GURU / ADMIN) ==================== -->
   <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
@@ -1551,6 +1576,7 @@
   <!-- ==================== LOGIKA UI & INTERAKSI ==================== -->
   <script>
     let parsedDocxQuestions = [];
+    let lastViolationTimestamp = 0;
 
     window.safeCreateIcons = function() {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1603,6 +1629,119 @@
     window.closeCustomDialog = function() {
       document.getElementById('custom-dialog-modal').classList.add('hidden');
     };
+
+    // ==================== PENGAWAS FULLSCREEN & DETEKSI PINDAH TAB ====================
+    window.enterExamFullscreen = async function() {
+      try {
+        const elem = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen();
+          } else if (elem.webkitRequestFullscreen) {
+            await elem.webkitRequestFullscreen();
+          }
+        }
+      } catch (e) {
+        console.warn('Browser membatasi fullscreen otomatis:', e);
+      }
+    };
+
+    window.exitExamFullscreen = async function() {
+      try {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            await document.webkitExitFullscreen();
+          }
+        }
+      } catch (e) {}
+    };
+
+    function playWarningBeep() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    function showSecurityOverlay(title, desc, badgeText, isWarning = false) {
+      const overlay = document.getElementById('exam-security-overlay');
+      const badge = document.getElementById('security-violation-badge');
+      document.getElementById('security-overlay-title').innerText = title;
+      document.getElementById('security-overlay-desc').innerText = desc;
+      badge.innerText = badgeText;
+      badge.className = isWarning
+        ? 'inline-block bg-rose-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-2 animate-pulse'
+        : 'inline-block bg-amber-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-2';
+      overlay.classList.remove('hidden');
+      window.safeCreateIcons();
+    }
+
+    window.resumeExamFullscreen = async function() {
+      await window.enterExamFullscreen();
+      document.getElementById('exam-security-overlay').classList.add('hidden');
+    };
+
+    function registerTabSwitchViolation(reason) {
+      if (!window.SAS_APP || !window.SAS_APP.activeExam) return;
+      const now = Date.now();
+      if (now - lastViolationTimestamp < 1800) return;
+      lastViolationTimestamp = now;
+
+      window.SAS_APP.tabViolations = (window.SAS_APP.tabViolations || 0) + 1;
+      const count = window.SAS_APP.tabViolations;
+      const max = window.SAS_APP.maxTabViolations || 3;
+
+      playWarningBeep();
+      window.saveCurrentExamProgress();
+
+      if (count >= max) {
+        document.getElementById('exam-security-overlay').classList.add('hidden');
+        submitExam(false, `Ujian otomatis dikumpulkan karena terdeteksi meninggalkan halaman ujian sebanyak ${count} kali (${reason}).`);
+      } else {
+        showSecurityOverlay(
+          `Peringatan Pelanggaran (${count} / ${max})`,
+          `Anda terdeteksi meninggalkan layar ujian (${reason}). Jika mencapai ${max} kali pelanggaran, lembar jawaban akan otomatis dikumpulkan dan dikunci!`,
+          `PELANGGARAN KE-${count} DARI ${max}`,
+          true
+        );
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && window.SAS_APP && window.SAS_APP.activeExam) {
+        registerTabSwitchViolation('Berpindah Tab / Membuka Aplikasi Lain');
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (window.SAS_APP && window.SAS_APP.activeExam) {
+        registerTabSwitchViolation('Keluar dari Jendela Browser');
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs && window.SAS_APP && window.SAS_APP.activeExam) {
+        showSecurityOverlay(
+          'Mode Layar Penuh Terkeluar',
+          'Lembar soal dikunci sementara karena Anda keluar dari tampilan layar penuh. Tekan tombol di bawah untuk kembali melanjutkan ujian.',
+          `PELANGGARAN TERCATAT: ${window.SAS_APP.tabViolations || 0} / ${window.SAS_APP.maxTabViolations || 3}`,
+          false
+        );
+      }
+    });
 
     window.switchView = async function(viewId) {
       const user = window.SAS_APP.currentUser;
@@ -1852,6 +1991,7 @@
           examDoubts: window.SAS_APP.examDoubts || {},
           currentQuestionIdx: window.SAS_APP.currentQuestionIdx || 0,
           timeLeft: window.SAS_APP.timeLeft,
+          tabViolations: window.SAS_APP.tabViolations || 0,
           updatedAt: Date.now()
         };
         localStorage.setItem(getSavedProgressKey(exam.id, profile.id), JSON.stringify(payload));
@@ -1948,7 +2088,7 @@
       window.safeCreateIcons();
     };
 
-    window.startStudentExam = function(examId, studentId, studentName, studentClass) {
+    window.startStudentExam = async function(examId, studentId, studentName, studentClass) {
       const exam = window.SAS_APP.data.exams.find(e => e.id === examId);
       if (!exam || !exam.questions || exam.questions.length === 0) {
         showNotify('Soal Tidak Tersedia', 'Paket soal ini belum memiliki daftar pertanyaan.', true);
@@ -1967,6 +2107,8 @@
         return;
       }
 
+      await window.enterExamFullscreen();
+
       window.SAS_APP.activeExam = exam;
       window.SAS_APP.userProfile = { id: studentId, name: studentName, class: studentClass, role: 'siswa' };
 
@@ -1976,6 +2118,7 @@
       if (savedProg) {
         window.SAS_APP.examAnswers = savedProg.examAnswers || {};
         window.SAS_APP.examDoubts = savedProg.examDoubts || {};
+        window.SAS_APP.tabViolations = savedProg.tabViolations || 0;
         const maxIdx = Math.max(0, exam.questions.length - 1);
         window.SAS_APP.currentQuestionIdx = Math.min(savedProg.currentQuestionIdx || 0, maxIdx);
         if (typeof savedProg.timeLeft === 'number' && savedProg.timeLeft > 0) {
@@ -1984,6 +2127,7 @@
       } else {
         window.SAS_APP.examAnswers = {};
         window.SAS_APP.examDoubts = {};
+        window.SAS_APP.tabViolations = 0;
         window.SAS_APP.currentQuestionIdx = 0;
       }
 
@@ -2053,10 +2197,7 @@
       const question = exam.questions[idx];
 
       document.getElementById('current-question-num').innerText = `${idx + 1} / ${exam.questions.length}`;
-      const qImgsList = Array.isArray(question.images) && question.images.length > 0
-        ? question.images
-        : (question.image ? [question.image] : []);
-      const qImgHtml = qImgsList.map((src, i) => `<img src="${src}" alt="Gambar Soal ${idx + 1}-${i + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">`).join('');
+      const qImgHtml = question.image ? `<img src="${question.image}" alt="Gambar Soal ${idx + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">` : '';
       document.getElementById('question-text').innerHTML = `<div class="arabic-aware">${idx + 1}. ${formatArabicTextHtml(question.question)}</div>${qImgHtml}`;
 
       const optionsContainer = document.getElementById('options-container');
@@ -2143,10 +2284,11 @@
       }).join('');
     }
 
-    window.submitExam = async function(isAutoTimeout = false) {
+    window.submitExam = async function(isAutoTimeout = false, forcedReason = '') {
       clearInterval(window.SAS_APP.examTimer);
 
       const exam = window.SAS_APP.activeExam;
+      if (!exam) return;
       const answers = { ...window.SAS_APP.examAnswers };
       let correctCount = 0;
 
@@ -2157,6 +2299,7 @@
       });
 
       const score = Math.round((correctCount / exam.questions.length) * 100);
+      const violations = window.SAS_APP.tabViolations || 0;
 
       const resultObj = {
         examId: exam.id,
@@ -2168,6 +2311,7 @@
         score: score,
         correctCount: correctCount,
         totalQuestions: exam.questions.length,
+        tabViolations: violations,
         studentAnswers: answers,
         completedAt: new Date().toLocaleString('id-ID')
       };
@@ -2176,8 +2320,12 @@
         await window.DB_SERVICE.submitExamResult(resultObj);
         window.clearSavedExamProgress(exam.id, window.SAS_APP.userProfile.id);
         window.SAS_APP.activeExam = null;
+        document.getElementById('exam-security-overlay').classList.add('hidden');
+        await window.exitExamFullscreen();
 
-        const prefix = isAutoTimeout ? 'Waktu Habis! Jawaban otomatis dikirim.\n\n' : '';
+        const prefix = forcedReason
+          ? `${forcedReason}\n\n`
+          : (isAutoTimeout ? 'Waktu Habis! Jawaban otomatis dikirim.\n\n' : '');
         showNotify(
           'Ujian Selesai!',
           `${prefix}Peserta: ${resultObj.studentName}\nNilai Akhir: ${score} / 100\nJawaban Benar: ${correctCount} dari ${exam.questions.length} soal.`
@@ -2189,6 +2337,7 @@
       }
     };
 
+    // ==================== PARSER WORD (.DOCX) LENGKAP ====================
     function compressBase64Image(dataUrl, maxWidth = 680, quality = 0.72) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -2215,6 +2364,161 @@
       });
     }
 
+    function convertOmmlToReadableText(ommlNode) {
+      const local = ommlNode.localName || '';
+      if (local === 't') return ommlNode.textContent || '';
+      if (local === 'f') {
+        const num = ommlNode.getElementsByTagNameNS('*', 'num')[0];
+        const den = ommlNode.getElementsByTagNameNS('*', 'den')[0];
+        return `(${num ? convertOmmlToReadableText(num) : ''}/${den ? convertOmmlToReadableText(den) : ''})`;
+      }
+      if (local === 'sSup') {
+        const e = ommlNode.getElementsByTagNameNS('*', 'e')[0];
+        const sup = ommlNode.getElementsByTagNameNS('*', 'sup')[0];
+        return `${e ? convertOmmlToReadableText(e) : ''}^${sup ? convertOmmlToReadableText(sup) : ''}`;
+      }
+      if (local === 'sSub') {
+        const e = ommlNode.getElementsByTagNameNS('*', 'e')[0];
+        const sub = ommlNode.getElementsByTagNameNS('*', 'sub')[0];
+        return `${e ? convertOmmlToReadableText(e) : ''}_${sub ? convertOmmlToReadableText(sub) : ''}`;
+      }
+      if (local === 'rad') {
+        const deg = ommlNode.getElementsByTagNameNS('*', 'deg')[0];
+        const e = ommlNode.getElementsByTagNameNS('*', 'e')[0];
+        const degText = deg ? convertOmmlToReadableText(deg).trim() : '';
+        return `${degText ? degText : ''}√(${e ? convertOmmlToReadableText(e) : ''})`;
+      }
+      let out = '';
+      for (const child of ommlNode.childNodes) {
+        if (child.nodeType === 1) out += convertOmmlToReadableText(child);
+      }
+      return out;
+    }
+
+    function formatNumberingIndex(val, numFmt) {
+      if (numFmt === 'lowerLetter') return String.fromCharCode(96 + val) + '. ';
+      if (numFmt === 'upperLetter') return String.fromCharCode(64 + val) + '. ';
+      if (numFmt === 'lowerRoman') {
+        const romans = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+        return (romans[val - 1] || val) + '. ';
+      }
+      if (numFmt === 'upperRoman') {
+        const romans = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+        return (romans[val - 1] || val) + '. ';
+      }
+      if (numFmt === 'bullet') return '• ';
+      return `${val}. `;
+    }
+
+    async function prepareDocxXmlBuffer(arrayBuffer) {
+      if (!window.JSZip) return arrayBuffer;
+      try {
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const docFile = zip.file('word/document.xml');
+        if (!docFile) return arrayBuffer;
+
+        const parser = new DOMParser();
+        const docXmlStr = await docFile.async('string');
+        const xmlDoc = parser.parseFromString(docXmlStr, 'application/xml');
+        const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+        // 1. Konversi Word Equation (m:oMath) menjadi teks matematika terbaca
+        const oMaths = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMath'));
+        oMaths.forEach(mathEl => {
+          const textVal = convertOmmlToReadableText(mathEl).trim();
+          if (textVal && mathEl.parentNode) {
+            const rEl = xmlDoc.createElementNS(W_NS, 'w:r');
+            const tEl = xmlDoc.createElementNS(W_NS, 'w:t');
+            tEl.textContent = ` ${textVal} `;
+            rEl.appendChild(tEl);
+            mathEl.parentNode.replaceChild(rEl, mathEl);
+          }
+        });
+
+        // 2. Ekstrak definisi Auto-Numbering Word (word/numbering.xml) agar nomor soal & opsi A-D tidak hilang
+        const numFile = zip.file('word/numbering.xml');
+        if (numFile) {
+          const numXmlStr = await numFile.async('string');
+          const numDoc = parser.parseFromString(numXmlStr, 'application/xml');
+
+          const abstractMap = {};
+          Array.from(numDoc.getElementsByTagNameNS(W_NS, 'abstractNum')).forEach(absEl => {
+            const absId = absEl.getAttribute('w:abstractNumId') || absEl.getAttribute('abstractNumId');
+            abstractMap[absId] = {};
+            Array.from(absEl.getElementsByTagNameNS(W_NS, 'lvl')).forEach(lvlEl => {
+              const ilvl = lvlEl.getAttribute('w:ilvl') || lvlEl.getAttribute('ilvl') || '0';
+              const fmtEl = lvlEl.getElementsByTagNameNS(W_NS, 'numFmt')[0];
+              const startEl = lvlEl.getElementsByTagNameNS(W_NS, 'start')[0];
+              abstractMap[absId][ilvl] = {
+                numFmt: fmtEl ? (fmtEl.getAttribute('w:val') || fmtEl.getAttribute('val') || 'decimal') : 'decimal',
+                start: startEl ? parseInt(startEl.getAttribute('w:val') || startEl.getAttribute('val') || '1', 10) : 1
+              };
+            });
+          });
+
+          const numToAbstract = {};
+          Array.from(numDoc.getElementsByTagNameNS(W_NS, 'num')).forEach(numEl => {
+            const numId = numEl.getAttribute('w:numId') || numEl.getAttribute('numId');
+            const absRef = numEl.getElementsByTagNameNS(W_NS, 'abstractNumId')[0];
+            if (numId && absRef) {
+              numToAbstract[numId] = absRef.getAttribute('w:val') || absRef.getAttribute('val');
+            }
+          });
+
+          const counters = {};
+          Array.from(xmlDoc.getElementsByTagNameNS(W_NS, 'p')).forEach(pEl => {
+            const numPr = pEl.getElementsByTagNameNS(W_NS, 'numPr')[0];
+            if (!numPr) return;
+            const numIdEl = numPr.getElementsByTagNameNS(W_NS, 'numId')[0];
+            const ilvlEl = numPr.getElementsByTagNameNS(W_NS, 'ilvl')[0];
+            const numId = numIdEl ? (numIdEl.getAttribute('w:val') || numIdEl.getAttribute('val')) : null;
+            const ilvl = ilvlEl ? (ilvlEl.getAttribute('w:val') || ilvlEl.getAttribute('val') || '0') : '0';
+
+            if (!numId || numId === '0') return;
+            const absId = numToAbstract[numId];
+            const lvlInfo = (abstractMap[absId] && abstractMap[absId][ilvl]) || { numFmt: ilvl === '0' ? 'decimal' : 'upperLetter', start: 1 };
+
+            const key = `${numId}_${ilvl}`;
+            if (counters[key] === undefined) {
+              counters[key] = lvlInfo.start;
+            } else {
+              counters[key]++;
+            }
+
+            // Reset sub-level saat level induk bertambah
+            if (ilvl === '0') {
+              Object.keys(counters).forEach(k => {
+                if (k.startsWith(`${numId}_`) && k !== key) delete counters[k];
+              });
+            }
+
+            const prefixText = formatNumberingIndex(counters[key], lvlInfo.numFmt);
+            // Hapus numPr agar Mammoth tidak menggandakan nomor, lalu sisipkan teks nomor eksplisit di awal paragraf
+            numPr.parentNode.removeChild(numPr);
+            const rEl = xmlDoc.createElementNS(W_NS, 'w:r');
+            const tEl = xmlDoc.createElementNS(W_NS, 'w:t');
+            tEl.setAttribute('xml:space', 'preserve');
+            tEl.textContent = prefixText;
+            rEl.appendChild(tEl);
+
+            const pPr = pEl.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr && pPr.nextSibling) {
+              pEl.insertBefore(rEl, pPr.nextSibling);
+            } else {
+              pEl.insertBefore(rEl, pEl.firstChild);
+            }
+          });
+        }
+
+        const serializer = new XMLSerializer();
+        zip.file('word/document.xml', serializer.serializeToString(xmlDoc));
+        return await zip.generateAsync({ type: 'arraybuffer' });
+      } catch (err) {
+        console.warn('Fallback ke pembacaan standar Mammoth:', err);
+        return arrayBuffer;
+      }
+    }
+
     window.processDocxImport = function(inputElement) {
       const file = inputElement.files[0];
       if (!file) return;
@@ -2224,10 +2528,7 @@
       const reader = new FileReader();
       reader.onload = async function(e) {
         try {
-          const arrayBuffer = e.target.result;
-          // 1. Ekstrak persamaan Word Equation (OMML) & konversi Auto-Numbering Word (w:numPr) menjadi label eksplisit sebelum dibaca Mammoth
-          const preparedBuffer = await prepareDocxXmlBuffer(arrayBuffer);
-
+          const preparedBuffer = await prepareDocxXmlBuffer(e.target.result);
           const options = {
             convertImage: mammoth.images.imgElement(function(image) {
               return image.read("base64").then(async function(imageBuffer) {
@@ -2248,237 +2549,57 @@
       reader.readAsArrayBuffer(file);
     };
 
-    // Membaca word/numbering.xml & word/document.xml untuk menyematkan label nomor soal / huruf opsi A-D asli dari Word serta persamaan OMML
-    async function prepareDocxXmlBuffer(arrayBuffer) {
-      if (!window.JSZip) return arrayBuffer;
-      try {
-        const zip = await JSZip.loadAsync(arrayBuffer);
-        const docXmlFile = zip.file('word/document.xml');
-        if (!docXmlFile) return arrayBuffer;
+    function normalizeDigits(str) {
+      return str.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    }
 
-        const parser = new DOMParser();
-        const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    function extractFormattedHtmlText(el) {
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('img').forEach(img => img.remove());
+      clone.querySelectorAll('sup').forEach(s => { s.textContent = `^${s.textContent}`; });
+      clone.querySelectorAll('sub').forEach(s => { s.textContent = `_${s.textContent}`; });
+      return clone.textContent.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+    }
 
-        // 1. Petakan definisi numbering Word (numId + ilvl -> format angka/huruf & start)
-        const numFmtMap = {};
-        const numXmlFile = zip.file('word/numbering.xml');
-        if (numXmlFile) {
-          const numStr = await numXmlFile.async('string');
-          const numDoc = parser.parseFromString(numStr, 'application/xml');
-          const abstractDefs = {};
-
-          Array.from(numDoc.getElementsByTagNameNS('*', 'abstractNum')).forEach(abs => {
-            const absId = abs.getAttribute('w:abstractNumId') || abs.getAttribute('abstractNumId');
-            abstractDefs[absId] = {};
-            Array.from(abs.getElementsByTagNameNS('*', 'lvl')).forEach(lvl => {
-              const ilvl = lvl.getAttribute('w:ilvl') || lvl.getAttribute('ilvl') || '0';
-              const fmtEl = lvl.getElementsByTagNameNS('*', 'numFmt')[0];
-              const startEl = lvl.getElementsByTagNameNS('*', 'start')[0];
-              const lvlTextEl = lvl.getElementsByTagNameNS('*', 'lvlText')[0];
-              abstractDefs[absId][ilvl] = {
-                fmt: fmtEl ? (fmtEl.getAttribute('w:val') || fmtEl.getAttribute('val') || 'decimal') : 'decimal',
-                start: startEl ? parseInt(startEl.getAttribute('w:val') || startEl.getAttribute('val') || '1', 10) : 1,
-                lvlText: lvlTextEl ? (lvlTextEl.getAttribute('w:val') || lvlTextEl.getAttribute('val') || '%1.') : '%1.'
-              };
-            });
-          });
-
-          Array.from(numDoc.getElementsByTagNameNS('*', 'num')).forEach(num => {
-            const numId = num.getAttribute('w:numId') || num.getAttribute('numId');
-            const absRef = num.getElementsByTagNameNS('*', 'abstractNumId')[0];
-            const absId = absRef ? (absRef.getAttribute('w:val') || absRef.getAttribute('val')) : null;
-            if (numId && absId && abstractDefs[absId]) {
-              numFmtMap[numId] = JSON.parse(JSON.stringify(abstractDefs[absId]));
-              Array.from(num.getElementsByTagNameNS('*', 'lvlOverride')).forEach(ov => {
-                const ilvl = ov.getAttribute('w:ilvl') || ov.getAttribute('ilvl') || '0';
-                const startOv = ov.getElementsByTagNameNS('*', 'startOverride')[0];
-                if (startOv && numFmtMap[numId][ilvl]) {
-                  numFmtMap[numId][ilvl].start = parseInt(startOv.getAttribute('w:val') || startOv.getAttribute('val') || '1', 10);
-                }
-              });
-            }
-          });
+    function splitInlineOptionsIfAny(text) {
+      // Mendukung opsi sejajar dalam 1 baris: "A. ... B. ... C. ... D. ..."
+      const inlineRegex = /(?:^|\s)([A-Da-d])[\.\)]\s+/g;
+      const matches = [...text.matchAll(inlineRegex)];
+      if (matches.length >= 2 && matches[0].index <= 2) {
+        const parts = [];
+        for (let i = 0; i < matches.length; i++) {
+          const key = matches[i][1].toUpperCase();
+          const start = matches[i].index + matches[i][0].length;
+          const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+          parts.push({ key, text: text.slice(start, end).trim() });
         }
-
-        const xmlStr = await docXmlFile.async('string');
-        const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-
-        // 2. Konversi OMML Matematika ke teks terbaca
-        function ommlNodeToText(node) {
-          if (!node) return '';
-          if (node.nodeType === 3) return node.nodeValue || '';
-          const local = node.localName;
-
-          if (local === 't') return node.textContent || '';
-          if (local === 'f') {
-            const num = ommlNodeToText(node.getElementsByTagNameNS('*', 'num')[0]).trim();
-            const den = ommlNodeToText(node.getElementsByTagNameNS('*', 'den')[0]).trim();
-            return `(${num}/${den})`;
-          }
-          if (local === 'sSup') {
-            const base = ommlNodeToText(node.getElementsByTagNameNS('*', 'e')[0]).trim();
-            const sup = ommlNodeToText(node.getElementsByTagNameNS('*', 'sup')[0]).trim();
-            const supMap = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', '+': '⁺' };
-            const prettySup = sup.split('').map(c => supMap[c] || `^${c}`).join('');
-            return `${base}${prettySup}`;
-          }
-          if (local === 'sSub') {
-            const base = ommlNodeToText(node.getElementsByTagNameNS('*', 'e')[0]).trim();
-            const sub = ommlNodeToText(node.getElementsByTagNameNS('*', 'sub')[0]).trim();
-            const subMap = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
-            const prettySub = sub.split('').map(c => subMap[c] || `_${c}`).join('');
-            return `${base}${prettySub}`;
-          }
-          if (local === 'rad') {
-            const deg = ommlNodeToText(node.getElementsByTagNameNS('*', 'deg')[0]).trim();
-            const expr = ommlNodeToText(node.getElementsByTagNameNS('*', 'e')[0]).trim();
-            return deg && deg !== '2' ? `${deg}√(${expr})` : `√(${expr})`;
-          }
-          if (local === 'nary') {
-            const chrEl = node.getElementsByTagNameNS('*', 'chr')[0];
-            const sym = chrEl ? (chrEl.getAttribute('m:val') || chrEl.getAttribute('val') || '∑') : '∑';
-            const expr = ommlNodeToText(node.getElementsByTagNameNS('*', 'e')[0]).trim();
-            return `${sym}(${expr})`;
-          }
-
-          let out = '';
-          for (let i = 0; i < node.childNodes.length; i++) {
-            out += ommlNodeToText(node.childNodes[i]);
-          }
-          return out;
-        }
-
-        const mathNodes = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMath'));
-        mathNodes.forEach(mNode => {
-          if (mNode.parentNode && mNode.parentNode.localName === 'oMathPara') return;
-          const eqText = ommlNodeToText(mNode).replace(/\s+/g, ' ').trim();
-          const rEl = xmlDoc.createElementNS(wNs, 'w:r');
-          const tEl = xmlDoc.createElementNS(wNs, 'w:t');
-          tEl.setAttribute('xml:space', 'preserve');
-          tEl.textContent = ` ${eqText} `;
-          rEl.appendChild(tEl);
-          mNode.parentNode.replaceChild(rEl, mNode);
-        });
-
-        const oMathParas = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMathPara'));
-        oMathParas.forEach(pNode => {
-          const eqText = ommlNodeToText(pNode).replace(/\s+/g, ' ').trim();
-          const rEl = xmlDoc.createElementNS(wNs, 'w:r');
-          const tEl = xmlDoc.createElementNS(wNs, 'w:t');
-          tEl.setAttribute('xml:space', 'preserve');
-          tEl.textContent = ` ${eqText} `;
-          rEl.appendChild(tEl);
-          pNode.parentNode.replaceChild(rEl, pNode);
-        });
-
-        // 3. Ubah Auto-Numbering Word (w:numPr) menjadi teks label eksplisit dan hapus w:numPr agar Mammoth tidak salah menomori opsi
-        const counters = {};
-        let lastNumId = null;
-        let lastIlvl = -1;
-
-        Array.from(xmlDoc.getElementsByTagNameNS('*', 'p')).forEach(p => {
-          const pPr = p.getElementsByTagNameNS('*', 'pPr')[0];
-          if (!pPr) return;
-          const numPr = pPr.getElementsByTagNameNS('*', 'numPr')[0];
-          if (!numPr) return;
-
-          const numIdEl = numPr.getElementsByTagNameNS('*', 'numId')[0];
-          const ilvlEl = numPr.getElementsByTagNameNS('*', 'ilvl')[0];
-          const numId = numIdEl ? (numIdEl.getAttribute('w:val') || numIdEl.getAttribute('val')) : null;
-          const ilvlStr = ilvlEl ? (ilvlEl.getAttribute('w:val') || ilvlEl.getAttribute('val') || '0') : '0';
-          const ilvl = parseInt(ilvlStr, 10) || 0;
-
-          if (!numId || numId === '0') return;
-
-          const def = (numFmtMap[numId] && numFmtMap[numId][ilvlStr]) || { fmt: ilvl > 0 ? 'lowerLetter' : 'decimal', start: 1 };
-          const key = `${numId}_${ilvlStr}`;
-
-          // Reset sub-level counter jika berpindah ke item induk baru
-          if (lastNumId === numId && ilvl < lastIlvl) {
-            Object.keys(counters).forEach(k => {
-              if (k.startsWith(`${numId}_`) && parseInt(k.split('_')[1], 10) > ilvl) {
-                delete counters[k];
-              }
-            });
-          }
-          // Reset counter opsi huruf (a-d) jika muncul daftar opsi baru setelah nomor soal
-          if (def.fmt.toLowerCase().includes('letter') && (lastNumId !== numId || lastIlvl !== ilvl)) {
-            counters[key] = def.start;
-          } else if (counters[key] === undefined) {
-            counters[key] = def.start;
-          } else {
-            counters[key]++;
-          }
-
-          const val = counters[key];
-          lastNumId = numId;
-          lastIlvl = ilvl;
-
-          const plainPText = (p.textContent || '').trim();
-          const alreadyPrefixed = /^(\d+|soal\s*\d+|[A-Da-dأابجد])[\.\)\:\-]\s*/i.test(plainPText);
-
-          if (!alreadyPrefixed && plainPText.length > 0) {
-            let label = '';
-            const fmtLower = def.fmt.toLowerCase();
-            if (fmtLower.includes('letter')) {
-              const charCode = 64 + Math.min(Math.max(val, 1), 26);
-              label = `${String.fromCharCode(charCode)}. `;
-            } else if (fmtLower === 'decimal' || fmtLower === 'decimalzero') {
-              label = `${val}. `;
-            }
-
-            if (label) {
-              const rEl = xmlDoc.createElementNS(wNs, 'w:r');
-              const tEl = xmlDoc.createElementNS(wNs, 'w:t');
-              tEl.setAttribute('xml:space', 'preserve');
-              tEl.textContent = label;
-              rEl.appendChild(tEl);
-
-              if (pPr.nextSibling) {
-                p.insertBefore(rEl, pPr.nextSibling);
-              } else {
-                p.appendChild(rEl);
-              }
-            }
-          }
-
-          // Hapus w:numPr supaya Mammoth merendernya sebagai paragraf bersih dengan label yang baru kita sisipkan
-          pPr.removeChild(numPr);
-        });
-
-        const serializer = new XMLSerializer();
-        zip.file('word/document.xml', serializer.serializeToString(xmlDoc));
-        return await zip.generateAsync({ type: 'arraybuffer' });
-      } catch (err) {
-        console.warn('Fallback tanpa konversi XML mendalam:', err);
-        return arrayBuffer;
+        return parts;
       }
+      return null;
     }
 
-    // Normalisasi angka Arab-Indic (١٢٣ -> 123), huruf opsi Arab (أ ب ج د), serta pangkat/subskrip HTML (<sup>, <sub>)
-    function normalizeDocxText(raw) {
-      if (!raw) return '';
-      return raw
-        .replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, '')
-        .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
-        .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
-        .replace(/\u00A0/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    function extractFormattedTextFromNode(node) {
-      const clone = node.cloneNode(true);
-      clone.querySelectorAll('sup').forEach(s => {
-        s.textContent = `^${s.textContent}`;
-      });
-      clone.querySelectorAll('sub').forEach(s => {
-        s.textContent = `_${s.textContent}`;
-      });
-      clone.querySelectorAll('br').forEach(b => {
-        b.replaceWith('\n');
-      });
-      return clone.textContent || '';
+    function finalizeQuestionOptions(qObj) {
+      if (!qObj) return;
+      const hasExplicitOptions = ['A', 'B', 'C', 'D'].some(k => qObj.options[k] || (qObj.optionImages && qObj.optionImages[k]));
+      // Jika file Word menulis 4 opsi tanpa huruf A/B/C/D (misalnya bullet atau baris langsung sebelum Kunci:)
+      if (!hasExplicitOptions && qObj._unlabeledLines && qObj._unlabeledLines.length >= 4) {
+        const optLines = qObj._unlabeledLines.slice(-4);
+        const extraQuestionLines = qObj._unlabeledLines.slice(0, -4);
+        extraQuestionLines.forEach(item => {
+          if (item.text) qObj.question = `${qObj.question} ${item.text}`.trim();
+          if (item.img && !qObj.image) qObj.image = item.img;
+        });
+        ['A', 'B', 'C', 'D'].forEach((key, idx) => {
+          qObj.options[key] = optLines[idx].text || '-';
+          if (optLines[idx].img) qObj.optionImages[key] = optLines[idx].img;
+        });
+      } else if (qObj._unlabeledLines && qObj._unlabeledLines.length > 0) {
+        qObj._unlabeledLines.forEach(item => {
+          if (item.text) qObj.question = `${qObj.question} ${item.text}`.trim();
+          if (item.img && !qObj.image) qObj.image = item.img;
+        });
+      }
+      delete qObj._unlabeledLines;
     }
 
     function parseDocxHtmlContent(htmlString) {
@@ -2486,252 +2607,147 @@
       tempDiv.innerHTML = htmlString;
 
       const blocks = [];
-      // Melacak apakah sedang berada di dalam blok soal yang baru saja dibuka (untuk mendeteksi <ol>/<ul> opsi A-D yang dibuat terpisah oleh Mammoth)
-      let insideQuestionBlock = false;
-
-      // Telusuri DOM secara berurutan agar Auto-Numbering Word (<ol>/<li>), paragraf (<p>), dan tabel (<tr>) terbaca utuh tanpa terlewat
-      function walkNodes(container, listContext = null) {
-        Array.from(container.children).forEach(el => {
+      function walkNodes(parent) {
+        Array.from(parent.children).forEach(el => {
           const tag = el.tagName;
-
-          if (tag === 'OL' || tag === 'UL') {
-            const startAttr = parseInt(el.getAttribute('start') || '1', 10);
-            const listTypeAttr = (el.getAttribute('type') || '').trim();
-            const isAlphaList = listTypeAttr === 'a' || listTypeAttr === 'A' ||
-              (el.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(el.style.listStyleType || ''));
-            const itemCount = el.querySelectorAll(':scope > li').length;
-            // Mammoth sering mengonversi daftar huruf/bullet opsi Word (A., B., C., D.) menjadi <ol>/<ul> terpisah tepat setelah paragraf soal
-            const treatAsOptionList = isAlphaList ||
-              (tag === 'UL' && insideQuestionBlock && itemCount >= 2 && itemCount <= 5) ||
-              (listContext && listContext.parentIsQuestion) ||
-              (insideQuestionBlock && itemCount >= 2 && itemCount <= 5 && (isNaN(startAttr) || startAttr === 1));
-
-            walkNodes(el, {
-              type: tag,
-              index: isNaN(startAttr) ? 1 : startAttr,
-              isAlpha: treatAsOptionList,
-              parentIsQuestion: listContext ? listContext.parentIsQuestion : false
-            });
-            return;
-          }
-
-          if (tag === 'LI') {
-            const currentIndex = listContext ? listContext.index++ : 1;
-            const imgs = Array.from(el.querySelectorAll(':scope > img, :scope > p img, :scope > span img')).map(i => i.src);
-            const liClone = el.cloneNode(true);
-            liClone.querySelectorAll('ol, ul').forEach(nested => nested.remove());
-            const rawText = normalizeDocxText(extractFormattedTextFromNode(liClone));
-
-            if (rawText || imgs.length > 0) {
-              const alreadyHasNumber = /^(\d+|soal\s*\d+)[\.\)\:\-\s]/i.test(rawText);
-              const alreadyHasOption = /^\(?([A-D]|[أابجدهـ])[\.\)\:\-\s]/i.test(rawText);
-
-              let prefixedText = rawText;
-              if (!alreadyHasNumber && !alreadyHasOption) {
-                const isOptionLevel = listContext && (listContext.isAlpha || listContext.parentIsQuestion) && currentIndex >= 1 && currentIndex <= 5;
-                if (isOptionLevel) {
-                  const letters = ['A', 'B', 'C', 'D', 'E'];
-                  prefixedText = `${letters[currentIndex - 1]}. ${rawText}`;
-                } else if (listContext && listContext.type === 'OL') {
-                  prefixedText = `${currentIndex}. ${rawText}`;
-                  insideQuestionBlock = true;
-                }
-              } else if (alreadyHasNumber) {
-                insideQuestionBlock = true;
-              }
-              blocks.push({ text: prefixedText, imgs });
-            }
-
-            Array.from(el.children).forEach(child => {
-              if (child.tagName === 'OL' || child.tagName === 'UL') {
-                const subStart = parseInt(child.getAttribute('start') || '1', 10);
-                const subType = (child.getAttribute('type') || '').trim();
-                const isSubAlpha = subType === 'a' || subType === 'A' ||
-                  (child.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(child.style.listStyleType || ''));
-                walkNodes(child, {
-                  type: child.tagName,
-                  index: isNaN(subStart) ? 1 : subStart,
-                  isAlpha: isSubAlpha || true,
-                  parentIsQuestion: true
-                });
-              }
-            });
-            return;
-          }
-
           if (tag === 'TABLE') {
-            el.querySelectorAll('tr').forEach(tr => {
+            Array.from(el.querySelectorAll('tr')).forEach(tr => {
               const cells = Array.from(tr.querySelectorAll('td, th'));
-              if (cells.length === 0) return;
-
-              const firstCellText = normalizeDocxText(extractFormattedTextFromNode(cells[0]));
-              if (cells.length >= 2 && /^(\d+)[\.\)]?$/.test(firstCellText)) {
-                const qNum = firstCellText.replace(/[^\d]/g, '');
-                const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
-                const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
-                blocks.push({ text: `${qNum}. ${restText}`, imgs: rowImgs });
-                insideQuestionBlock = true;
-              } else if (cells.length >= 2 && /^\(?([A-Dأابجد])[\.\)\:]?$/i.test(firstCellText)) {
-                const optChar = firstCellText.replace(/[^A-Dأابجد]/gi, '');
-                const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
-                const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
-                blocks.push({ text: `${optChar}. ${restText}`, imgs: rowImgs });
-              } else {
-                cells.forEach(cell => {
-                  const cellPs = cell.querySelectorAll('p, li');
-                  if (cellPs.length > 0) {
-                    walkNodes(cell, listContext);
-                  } else {
-                    const cellText = normalizeDocxText(extractFormattedTextFromNode(cell));
-                    const cellImgs = Array.from(cell.querySelectorAll('img')).map(i => i.src);
-                    if (cellText || cellImgs.length > 0) {
-                      if (/^(?:soal\s*)?\d+\s*[\.\)\:\-]/i.test(cellText)) insideQuestionBlock = true;
-                      if (/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]/i.test(cellText)) insideQuestionBlock = false;
-                      blocks.push({ text: cellText, imgs: cellImgs });
-                    }
-                  }
-                });
+              if (cells.length >= 2) {
+                const c0 = extractFormattedHtmlText(cells[0]);
+                const c1 = extractFormattedHtmlText(cells[1]);
+                const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
+                if (/^(\d+[\.\)]?|[A-Da-d][\.\)]?)$/.test(c0)) {
+                  const sep = /[\.\)]$/.test(c0) ? ' ' : '. ';
+                  blocks.push({ text: `${c0}${sep}${c1}`.trim(), imgs, isListItem: false });
+                  return;
+                }
+              }
+              const text = extractFormattedHtmlText(tr);
+              const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
+              if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+            });
+          } else if (tag === 'OL' || tag === 'UL') {
+            Array.from(el.children).forEach(li => {
+              if (li.tagName === 'LI') {
+                const text = extractFormattedHtmlText(li);
+                const imgs = Array.from(li.querySelectorAll('img')).map(i => i.src);
+                if (text || imgs.length) blocks.push({ text, imgs, isListItem: true });
               }
             });
-            return;
-          }
-
-          if (tag === 'P' || tag === 'H1' || tag === 'H2' || tag === 'H3' || tag === 'H4') {
-            const rawLines = extractFormattedTextFromNode(el).split('\n');
+          } else if (tag === 'P' || /^H[1-6]$/.test(tag)) {
+            const text = extractFormattedHtmlText(el);
             const imgs = Array.from(el.querySelectorAll('img')).map(i => i.src);
-            const cleanLines = rawLines.map(l => normalizeDocxText(l)).filter(Boolean);
-
-            if (cleanLines.length === 0 && imgs.length > 0) {
-              blocks.push({ text: '', imgs });
-            } else {
-              cleanLines.forEach((ln, idx) => {
-                if (/^(?:soal\s*)?\d+\s*[\.\)\:\-]/i.test(ln)) {
-                  insideQuestionBlock = true;
-                } else if (/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]/i.test(ln)) {
-                  insideQuestionBlock = false;
-                }
-                blocks.push({ text: ln, imgs: idx === 0 ? imgs : [] });
-              });
-            }
-            return;
-          }
-
-          if (el.children && el.children.length > 0) {
-            walkNodes(el, listContext);
+            if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+          } else {
+            walkNodes(el);
           }
         });
       }
-
       walkNodes(tempDiv);
-
-      // Pecah baris jika beberapa opsi ditulis sejajar dalam 1 baris (misal: "A. 10   B. 20   C. 30   D. 40" atau "a. 10  b. 20")
-      const expandedBlocks = [];
-      blocks.forEach(blk => {
-        const txt = blk.text;
-        if (!txt) {
-          expandedBlocks.push(blk);
-          return;
-        }
-        const inlineSplit = txt.split(/(?=\s+\(?[A-Da-dأبجد][\.\)\:]\s+)/);
-        if (inlineSplit.length > 1 && /^\(?([A-Da-dأبجد])[\.\)\:]\s*/.test(inlineSplit[0].trim())) {
-          inlineSplit.forEach((part, idx) => {
-            expandedBlocks.push({
-              text: part.trim(),
-              imgs: idx === 0 ? blk.imgs : []
-            });
-          });
-        } else {
-          expandedBlocks.push(blk);
-        }
-      });
-
-      const arabicOptMap = { 'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D' };
 
       parsedDocxQuestions = [];
       let currentQ = null;
       let lastTarget = 'question';
       let lastOptionKey = null;
-      let pendingLeadingImages = [];
+      let pendingImagesBeforeNextQ = [];
+      const arabicOptMap = { 'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D' };
 
-      // Helper: Jika opsi di Word tidak memiliki awalan huruf eksplisit dan terkumpul 4 baris sebelum kunci/soal berikutnya, otomatis petakan ke A, B, C, D
-      function finalizeQuestionOptions(qObj) {
-        if (!qObj) return;
-        const rawLines = qObj.question.split('<br>').map(p => p.trim()).filter(Boolean);
-
-        // Jika opsi belum terisi (karena di Word ditulis tanpa huruf A/B/C/D atau memakai bullet), ambil 4 baris terakhir sebelum "Kunci :" sebagai opsi A, B, C, D
-        if (Object.keys(qObj.options).length === 0 && rawLines.length >= 5) {
-          const letters = ['A', 'B', 'C', 'D'];
-          const candidateOpts = rawLines.slice(-4);
-          qObj.question = rawLines.slice(0, -4).join('<br>');
-          letters.forEach((ltr, i) => {
-            qObj.options[ltr] = candidateOpts[i];
-          });
-        }
-      }
-
-      expandedBlocks.forEach(block => {
-        const line = block.text;
+      blocks.forEach(block => {
+        let line = normalizeDigits(block.text || '').trim();
         const imgs = block.imgs || [];
 
-        const qMatch = line.match(/^(?:soal\s*)?(\d+)\s*[\.\)\:\-]\s*(.*)/i);
-        const optMatch = line.match(/^\(?([A-Da-dأابجد])\s*[\.\)\:\-]\s*(.*)/);
-        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]\s*\(?([A-Da-dأابجد])\)?/i);
+        // Abaikan judul dokumen sebelum soal nomor 1
+        if (!currentQ && line && !/^(?:soal\s*)?(\d+)[\.\)\:\-]/i.test(line)) {
+          if (imgs.length > 0) pendingImagesBeforeNextQ.push(...imgs);
+          return;
+        }
 
-        if (qMatch && !optMatch && !keyMatch) {
+        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)[\s:\-\=]*([A-Da-dأابجد])/i);
+        const qMatch = line.match(/^(?:soal\s*)?(\d+)[\.\)\:\-]\s*(.*)/i);
+        const optMatch = line.match(/^[\(\[]?([A-Da-dأابجد])[\.\)\]]\s*(.*)/);
+        const bulletMatch = line.match(/^[•\-\*]\s*(.*)/);
+
+        // Tangani opsi yang diawali angka seperti "1)", "2)", "3)", "4)" setelah pertanyaan sudah terisi
+        const isNumberedSubOption = currentQ &&
+          qMatch &&
+          currentQ.question.length > 0 &&
+          (currentQ._unlabeledLines.length > 0 || ['A','B','C','D'].some(k => currentQ.options[k])) &&
+          parseInt(qMatch[1], 10) <= 4 &&
+          qMatch[2].length < 40;
+
+        if (keyMatch && currentQ) {
+          const rawKey = keyMatch[1];
+          currentQ.answer = arabicOptMap[rawKey] || rawKey.toUpperCase();
+          finalizeQuestionOptions(currentQ);
+          parsedDocxQuestions.push(currentQ);
+          currentQ = null;
+          lastTarget = 'key';
+          lastOptionKey = null;
+        } else if (qMatch && !isNumberedSubOption) {
           if (currentQ) {
             finalizeQuestionOptions(currentQ);
             parsedDocxQuestions.push(currentQ);
           }
-          const combinedImgs = [...pendingLeadingImages, ...imgs];
-          pendingLeadingImages = [];
           currentQ = {
             id: parseInt(qMatch[1], 10),
             question: qMatch[2].trim(),
-            image: combinedImgs[0] || '',
-            images: combinedImgs,
+            image: pendingImagesBeforeNextQ[0] || imgs[0] || '',
             options: {},
             optionImages: {},
-            answer: 'A'
+            answer: 'A',
+            _unlabeledLines: []
           };
+          pendingImagesBeforeNextQ = [];
           lastTarget = 'question';
           lastOptionKey = null;
         } else if (optMatch && currentQ) {
-          const rawOpt = optMatch[1].toUpperCase();
-          const optKey = arabicOptMap[rawOpt] || rawOpt;
-          currentQ.options[optKey] = optMatch[2].trim();
-          if (imgs[0]) {
-            currentQ.optionImages[optKey] = imgs[0];
+          const inlineParts = splitInlineOptionsIfAny(line);
+          if (inlineParts) {
+            inlineParts.forEach(p => {
+              currentQ.options[p.key] = p.text;
+            });
+            lastTarget = 'option';
+            lastOptionKey = inlineParts[inlineParts.length - 1].key;
+          } else {
+            const rawOpt = optMatch[1];
+            const optKey = arabicOptMap[rawOpt] || rawOpt.toUpperCase();
+            currentQ.options[optKey] = optMatch[2].trim();
+            if (imgs[0]) {
+              currentQ.optionImages[optKey] = imgs[0];
+            }
+            lastTarget = 'option';
+            lastOptionKey = optKey;
           }
-          lastTarget = 'option';
-          lastOptionKey = optKey;
-        } else if (keyMatch && currentQ) {
-          const rawKey = keyMatch[1].toUpperCase();
-          currentQ.answer = arabicOptMap[rawKey] || rawKey;
-          finalizeQuestionOptions(currentQ);
-          lastTarget = 'key';
-          lastOptionKey = null;
         } else if (currentQ) {
-          if (lastTarget === 'key') {
-            if (!line && imgs.length > 0) {
-              pendingLeadingImages.push(...imgs);
+          const cleanLine = bulletMatch ? bulletMatch[1].trim() : line;
+          const hasExplicitOptions = ['A', 'B', 'C', 'D'].some(k => currentQ.options[k] || currentQ.optionImages[k]);
+
+          if (hasExplicitOptions && lastTarget === 'option' && lastOptionKey) {
+            if (cleanLine) {
+              currentQ.options[lastOptionKey] = `${currentQ.options[lastOptionKey]} ${cleanLine}`.trim();
+            }
+            if (imgs[0] && !currentQ.optionImages[lastOptionKey]) {
+              currentQ.optionImages[lastOptionKey] = imgs[0];
             }
           } else {
-            if (line) {
-              if (lastTarget === 'option' && lastOptionKey) {
-                currentQ.options[lastOptionKey] = `${currentQ.options[lastOptionKey]} ${line}`.trim();
-              } else if (lastTarget === 'question') {
-                currentQ.question = currentQ.question ? `${currentQ.question}<br>${line}` : line;
-              }
-            }
-            if (imgs.length > 0) {
-              if (lastTarget === 'option' && lastOptionKey && !currentQ.optionImages[lastOptionKey]) {
-                currentQ.optionImages[lastOptionKey] = imgs[0];
+            // Simpan baris/gambar setelah baris soal utama; akan dipetakan otomatis ke opsi A-D jika ada 4 baris sebelum Kunci:
+            if (!currentQ.question && cleanLine) {
+              currentQ.question = cleanLine;
+              if (imgs[0] && !currentQ.image) currentQ.image = imgs[0];
+            } else if (cleanLine) {
+              currentQ._unlabeledLines.push({ text: cleanLine, img: imgs[0] || '' });
+            } else if (imgs.length > 0) {
+              if (!currentQ.image && currentQ._unlabeledLines.length === 0) {
+                currentQ.image = imgs[0];
               } else {
-                if (!currentQ.image) currentQ.image = imgs[0];
-                currentQ.images.push(...imgs);
+                currentQ._unlabeledLines.push({ text: '', img: imgs[0] });
               }
             }
           }
+        } else if (!currentQ && imgs.length > 0) {
+          // Gambar berada tepat setelah baris Kunci soal sebelumnya (milik soal berikutnya)
+          pendingImagesBeforeNextQ.push(...imgs);
         }
       });
 
@@ -2739,7 +2755,6 @@
         finalizeQuestionOptions(currentQ);
         parsedDocxQuestions.push(currentQ);
       }
-
       renderParsedQuestionsPreview();
     }
 
@@ -2752,14 +2767,10 @@
         return;
       }
 
-      container.innerHTML = parsedDocxQuestions.map((q, idx) => {
-        const previewImgs = (Array.isArray(q.images) && q.images.length > 0 ? q.images : (q.image ? [q.image] : []))
-          .map((src, i) => `<img src="${src}" alt="Gambar Soal ${idx + 1}-${i + 1}" class="max-h-36 rounded-lg border border-slate-200 object-contain">`)
-          .join('');
-        return `
+      container.innerHTML = parsedDocxQuestions.map((q, idx) => `
         <div class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
           <div class="font-bold text-slate-900 arabic-aware">${idx + 1}. ${formatArabicTextHtml(q.question)}</div>
-          ${previewImgs}
+          ${q.image ? `<img src="${q.image}" alt="Gambar Soal ${idx + 1}" class="max-h-36 rounded-lg border border-slate-200 object-contain">` : ''}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-600 pl-2">
             <div class="arabic-aware"><b>A.</b> ${formatArabicTextHtml(q.options.A || '-')} ${q.optionImages?.A ? `<img src="${q.optionImages.A}" class="max-h-20 mt-1 rounded border">` : ''}</div>
             <div class="arabic-aware"><b>B.</b> ${formatArabicTextHtml(q.options.B || '-')} ${q.optionImages?.B ? `<img src="${q.optionImages.B}" class="max-h-20 mt-1 rounded border">` : ''}</div>
@@ -2768,8 +2779,7 @@
           </div>
           <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded">Kunci Jawaban: ${q.answer}</span>
         </div>
-      `;
-      }).join('');
+      `).join('');
     }
 
     window.handleSaveExam = async function(e) {

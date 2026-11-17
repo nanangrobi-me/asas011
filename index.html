@@ -2225,8 +2225,8 @@
       reader.onload = async function(e) {
         try {
           const arrayBuffer = e.target.result;
-          // 1. Ekstrak persamaan Word Equation (OMML) dari document.xml jika soal mengandung rumus matematika Word
-          const mathInjectedBuffer = await injectWordEquationsToBuffer(arrayBuffer);
+          // 1. Ekstrak persamaan Word Equation (OMML) & konversi Auto-Numbering Word (w:numPr) menjadi label eksplisit sebelum dibaca Mammoth
+          const preparedBuffer = await prepareDocxXmlBuffer(arrayBuffer);
 
           const options = {
             convertImage: mammoth.images.imgElement(function(image) {
@@ -2238,7 +2238,7 @@
             })
           };
 
-          const result = await mammoth.convertToHtml({ arrayBuffer: mathInjectedBuffer }, options);
+          const result = await mammoth.convertToHtml({ arrayBuffer: preparedBuffer }, options);
           document.getElementById('file-name-display').innerText = `File terpilih: ${file.name}`;
           parseDocxHtmlContent(result.value);
         } catch (err) {
@@ -2248,22 +2248,62 @@
       reader.readAsArrayBuffer(file);
     };
 
-    // Konversi Word Equation (OMML m:oMath) menjadi teks matematika terbaca (pecahan, pangkat, akar, simbol)
-    async function injectWordEquationsToBuffer(arrayBuffer) {
+    // Membaca word/numbering.xml & word/document.xml untuk menyematkan label nomor soal / huruf opsi A-D asli dari Word serta persamaan OMML
+    async function prepareDocxXmlBuffer(arrayBuffer) {
       if (!window.JSZip) return arrayBuffer;
       try {
         const zip = await JSZip.loadAsync(arrayBuffer);
         const docXmlFile = zip.file('word/document.xml');
         if (!docXmlFile) return arrayBuffer;
 
-        const xmlStr = await docXmlFile.async('string');
-        if (!xmlStr.includes('oMath')) return arrayBuffer;
-
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-        const mathNodes = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMath'));
-        if (mathNodes.length === 0) return arrayBuffer;
+        const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+        // 1. Petakan definisi numbering Word (numId + ilvl -> format angka/huruf & start)
+        const numFmtMap = {};
+        const numXmlFile = zip.file('word/numbering.xml');
+        if (numXmlFile) {
+          const numStr = await numXmlFile.async('string');
+          const numDoc = parser.parseFromString(numStr, 'application/xml');
+          const abstractDefs = {};
+
+          Array.from(numDoc.getElementsByTagNameNS('*', 'abstractNum')).forEach(abs => {
+            const absId = abs.getAttribute('w:abstractNumId') || abs.getAttribute('abstractNumId');
+            abstractDefs[absId] = {};
+            Array.from(abs.getElementsByTagNameNS('*', 'lvl')).forEach(lvl => {
+              const ilvl = lvl.getAttribute('w:ilvl') || lvl.getAttribute('ilvl') || '0';
+              const fmtEl = lvl.getElementsByTagNameNS('*', 'numFmt')[0];
+              const startEl = lvl.getElementsByTagNameNS('*', 'start')[0];
+              const lvlTextEl = lvl.getElementsByTagNameNS('*', 'lvlText')[0];
+              abstractDefs[absId][ilvl] = {
+                fmt: fmtEl ? (fmtEl.getAttribute('w:val') || fmtEl.getAttribute('val') || 'decimal') : 'decimal',
+                start: startEl ? parseInt(startEl.getAttribute('w:val') || startEl.getAttribute('val') || '1', 10) : 1,
+                lvlText: lvlTextEl ? (lvlTextEl.getAttribute('w:val') || lvlTextEl.getAttribute('val') || '%1.') : '%1.'
+              };
+            });
+          });
+
+          Array.from(numDoc.getElementsByTagNameNS('*', 'num')).forEach(num => {
+            const numId = num.getAttribute('w:numId') || num.getAttribute('numId');
+            const absRef = num.getElementsByTagNameNS('*', 'abstractNumId')[0];
+            const absId = absRef ? (absRef.getAttribute('w:val') || absRef.getAttribute('val')) : null;
+            if (numId && absId && abstractDefs[absId]) {
+              numFmtMap[numId] = JSON.parse(JSON.stringify(abstractDefs[absId]));
+              Array.from(num.getElementsByTagNameNS('*', 'lvlOverride')).forEach(ov => {
+                const ilvl = ov.getAttribute('w:ilvl') || ov.getAttribute('ilvl') || '0';
+                const startOv = ov.getElementsByTagNameNS('*', 'startOverride')[0];
+                if (startOv && numFmtMap[numId][ilvl]) {
+                  numFmtMap[numId][ilvl].start = parseInt(startOv.getAttribute('w:val') || startOv.getAttribute('val') || '1', 10);
+                }
+              });
+            }
+          });
+        }
+
+        const xmlStr = await docXmlFile.async('string');
+        const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+
+        // 2. Konversi OMML Matematika ke teks terbaca
         function ommlNodeToText(node) {
           if (!node) return '';
           if (node.nodeType === 3) return node.nodeValue || '';
@@ -2308,7 +2348,7 @@
           return out;
         }
 
-        const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const mathNodes = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMath'));
         mathNodes.forEach(mNode => {
           if (mNode.parentNode && mNode.parentNode.localName === 'oMathPara') return;
           const eqText = ommlNodeToText(mNode).replace(/\s+/g, ' ').trim();
@@ -2331,11 +2371,86 @@
           pNode.parentNode.replaceChild(rEl, pNode);
         });
 
+        // 3. Ubah Auto-Numbering Word (w:numPr) menjadi teks label eksplisit dan hapus w:numPr agar Mammoth tidak salah menomori opsi
+        const counters = {};
+        let lastNumId = null;
+        let lastIlvl = -1;
+
+        Array.from(xmlDoc.getElementsByTagNameNS('*', 'p')).forEach(p => {
+          const pPr = p.getElementsByTagNameNS('*', 'pPr')[0];
+          if (!pPr) return;
+          const numPr = pPr.getElementsByTagNameNS('*', 'numPr')[0];
+          if (!numPr) return;
+
+          const numIdEl = numPr.getElementsByTagNameNS('*', 'numId')[0];
+          const ilvlEl = numPr.getElementsByTagNameNS('*', 'ilvl')[0];
+          const numId = numIdEl ? (numIdEl.getAttribute('w:val') || numIdEl.getAttribute('val')) : null;
+          const ilvlStr = ilvlEl ? (ilvlEl.getAttribute('w:val') || ilvlEl.getAttribute('val') || '0') : '0';
+          const ilvl = parseInt(ilvlStr, 10) || 0;
+
+          if (!numId || numId === '0') return;
+
+          const def = (numFmtMap[numId] && numFmtMap[numId][ilvlStr]) || { fmt: ilvl > 0 ? 'lowerLetter' : 'decimal', start: 1 };
+          const key = `${numId}_${ilvlStr}`;
+
+          // Reset sub-level counter jika berpindah ke item induk baru
+          if (lastNumId === numId && ilvl < lastIlvl) {
+            Object.keys(counters).forEach(k => {
+              if (k.startsWith(`${numId}_`) && parseInt(k.split('_')[1], 10) > ilvl) {
+                delete counters[k];
+              }
+            });
+          }
+          // Reset counter opsi huruf (a-d) jika muncul daftar opsi baru setelah nomor soal
+          if (def.fmt.toLowerCase().includes('letter') && (lastNumId !== numId || lastIlvl !== ilvl)) {
+            counters[key] = def.start;
+          } else if (counters[key] === undefined) {
+            counters[key] = def.start;
+          } else {
+            counters[key]++;
+          }
+
+          const val = counters[key];
+          lastNumId = numId;
+          lastIlvl = ilvl;
+
+          const plainPText = (p.textContent || '').trim();
+          const alreadyPrefixed = /^(\d+|soal\s*\d+|[A-Da-dأابجد])[\.\)\:\-]\s*/i.test(plainPText);
+
+          if (!alreadyPrefixed && plainPText.length > 0) {
+            let label = '';
+            const fmtLower = def.fmt.toLowerCase();
+            if (fmtLower.includes('letter')) {
+              const charCode = 64 + Math.min(Math.max(val, 1), 26);
+              label = `${String.fromCharCode(charCode)}. `;
+            } else if (fmtLower === 'decimal' || fmtLower === 'decimalzero') {
+              label = `${val}. `;
+            }
+
+            if (label) {
+              const rEl = xmlDoc.createElementNS(wNs, 'w:r');
+              const tEl = xmlDoc.createElementNS(wNs, 'w:t');
+              tEl.setAttribute('xml:space', 'preserve');
+              tEl.textContent = label;
+              rEl.appendChild(tEl);
+
+              if (pPr.nextSibling) {
+                p.insertBefore(rEl, pPr.nextSibling);
+              } else {
+                p.appendChild(rEl);
+              }
+            }
+          }
+
+          // Hapus w:numPr supaya Mammoth merendernya sebagai paragraf bersih dengan label yang baru kita sisipkan
+          pPr.removeChild(numPr);
+        });
+
         const serializer = new XMLSerializer();
         zip.file('word/document.xml', serializer.serializeToString(xmlDoc));
         return await zip.generateAsync({ type: 'arraybuffer' });
       } catch (err) {
-        console.warn('Fallback tanpa konversi OMML:', err);
+        console.warn('Fallback tanpa konversi XML mendalam:', err);
         return arrayBuffer;
       }
     }
@@ -2371,6 +2486,8 @@
       tempDiv.innerHTML = htmlString;
 
       const blocks = [];
+      // Melacak apakah sedang berada di dalam blok soal yang baru saja dibuka (untuk mendeteksi <ol>/<ul> opsi A-D yang dibuat terpisah oleh Mammoth)
+      let insideQuestionBlock = false;
 
       // Telusuri DOM secara berurutan agar Auto-Numbering Word (<ol>/<li>), paragraf (<p>), dan tabel (<tr>) terbaca utuh tanpa terlewat
       function walkNodes(container, listContext = null) {
@@ -2382,10 +2499,16 @@
             const listTypeAttr = (el.getAttribute('type') || '').trim();
             const isAlphaList = listTypeAttr === 'a' || listTypeAttr === 'A' ||
               (el.style && /lower-alpha|upper-alpha|lower-latin|upper-latin/i.test(el.style.listStyleType || ''));
+            const itemCount = el.querySelectorAll(':scope > li').length;
+            // Mammoth sering mengonversi daftar huruf Word (A., B., C., D.) menjadi <ol> terpisah tanpa atribut type="A" tepat setelah paragraf soal
+            const treatAsOptionList = isAlphaList ||
+              (listContext && listContext.parentIsQuestion) ||
+              (insideQuestionBlock && itemCount >= 2 && itemCount <= 5 && (isNaN(startAttr) || startAttr === 1));
+
             walkNodes(el, {
               type: tag,
               index: isNaN(startAttr) ? 1 : startAttr,
-              isAlpha: isAlphaList,
+              isAlpha: treatAsOptionList,
               parentIsQuestion: listContext ? listContext.parentIsQuestion : false
             });
             return;
@@ -2404,13 +2527,16 @@
 
               let prefixedText = rawText;
               if (!alreadyHasNumber && !alreadyHasOption) {
-                const isOptionLevel = listContext && (listContext.isAlpha || listContext.parentIsQuestion) && currentIndex >= 1 && currentIndex <= 4;
+                const isOptionLevel = listContext && (listContext.isAlpha || listContext.parentIsQuestion) && currentIndex >= 1 && currentIndex <= 5;
                 if (isOptionLevel) {
-                  const letters = ['A', 'B', 'C', 'D'];
+                  const letters = ['A', 'B', 'C', 'D', 'E'];
                   prefixedText = `${letters[currentIndex - 1]}. ${rawText}`;
                 } else if (listContext && listContext.type === 'OL') {
                   prefixedText = `${currentIndex}. ${rawText}`;
+                  insideQuestionBlock = true;
                 }
+              } else if (alreadyHasNumber) {
+                insideQuestionBlock = true;
               }
               blocks.push({ text: prefixedText, imgs });
             }
@@ -2424,7 +2550,7 @@
                 walkNodes(child, {
                   type: child.tagName,
                   index: isNaN(subStart) ? 1 : subStart,
-                  isAlpha: isSubAlpha,
+                  isAlpha: isSubAlpha || true,
                   parentIsQuestion: true
                 });
               }
@@ -2443,6 +2569,7 @@
                 const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
                 const rowImgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
                 blocks.push({ text: `${qNum}. ${restText}`, imgs: rowImgs });
+                insideQuestionBlock = true;
               } else if (cells.length >= 2 && /^\(?([A-Dأابجد])[\.\)\:]?$/i.test(firstCellText)) {
                 const optChar = firstCellText.replace(/[^A-Dأابجد]/gi, '');
                 const restText = cells.slice(1).map(c => normalizeDocxText(extractFormattedTextFromNode(c))).filter(Boolean).join(' ');
@@ -2457,6 +2584,8 @@
                     const cellText = normalizeDocxText(extractFormattedTextFromNode(cell));
                     const cellImgs = Array.from(cell.querySelectorAll('img')).map(i => i.src);
                     if (cellText || cellImgs.length > 0) {
+                      if (/^(?:soal\s*)?\d+\s*[\.\)\:\-]/i.test(cellText)) insideQuestionBlock = true;
+                      if (/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]/i.test(cellText)) insideQuestionBlock = false;
                       blocks.push({ text: cellText, imgs: cellImgs });
                     }
                   }
@@ -2475,6 +2604,11 @@
               blocks.push({ text: '', imgs });
             } else {
               cleanLines.forEach((ln, idx) => {
+                if (/^(?:soal\s*)?\d+\s*[\.\)\:\-]/i.test(ln)) {
+                  insideQuestionBlock = true;
+                } else if (/^(?:kunci\s*jawaban|kunci|jawaban|kj)\s*[\:\=\-\s]/i.test(ln)) {
+                  insideQuestionBlock = false;
+                }
                 blocks.push({ text: ln, imgs: idx === 0 ? imgs : [] });
               });
             }
@@ -2518,7 +2652,7 @@
       let lastOptionKey = null;
       let pendingLeadingImages = [];
 
-      // Helper: Jika opsi di Word memakai numbering kustom sehingga Mammoth mengonversinya menjadi paragraf biasa tanpa huruf A-D sebelum "Kunci: X", otomatis tetapkan sebagai A, B, C, D
+      // Helper: Jika opsi di Word tidak memiliki awalan huruf eksplisit dan terkumpul 4 baris sebelum kunci/soal berikutnya, otomatis petakan ke A, B, C, D
       function finalizeQuestionOptions(qObj) {
         if (!qObj) return;
         if (Object.keys(qObj.options).length === 0 && qObj.question.includes('<br>')) {
@@ -2577,7 +2711,6 @@
           lastOptionKey = null;
         } else if (currentQ) {
           if (lastTarget === 'key') {
-            // Jika sudah melewati baris "Kunci: X" dan muncul gambar tanpa teks sebelum nomor soal berikutnya (seperti gambar sebelum soal no. 11), simpan untuk soal berikutnya
             if (!line && imgs.length > 0) {
               pendingLeadingImages.push(...imgs);
             }

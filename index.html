@@ -2211,23 +2211,63 @@
       clone.querySelectorAll('img').forEach(img => img.remove());
       clone.querySelectorAll('sup').forEach(s => { s.textContent = `^${s.textContent}`; });
       clone.querySelectorAll('sub').forEach(s => { s.textContent = `_${s.textContent}`; });
-      return clone.textContent.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+      // Pertahankan pemisah baris jika ada <br> di dalam satu paragraf Word (Shift+Enter)
+      clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+      return clone.textContent.replace(/\u00A0/g, ' ').replace(/[ \t]+/g, ' ').trim();
     }
 
     function splitInlineOptionsIfAny(text) {
-      const inlineRegex = /(?:^|\s)([A-Da-d])[\.\)]\s+/g;
-      const matches = [...text.matchAll(inlineRegex)];
-      if (matches.length >= 2 && matches[0].index <= 2) {
+      // Mendukung pemisahan opsi meskipun:
+      // 1. Terpisah spasi/tab (A. ... B. ... C. ... D. ...)
+      // 2. Menempel tanpa spasi setelah akhir kata/tanda baca (...berhijrahb. datangnya... / ...Makkahc. ...)
+      // 3. Menggunakan kurung atau titik (a. / a) / (a) / A.)
+      // 4. Menggunakan huruf Arab (أ. / ب. / ج. / د.)
+      const inlineRegex = /(?:^|[\s\.\?\!\)\]\}\"\'\u0600-\u06FF])([A-Da-dأابجد])[\.\)]\s+/g;
+      const matches = [];
+      let m;
+      while ((m = inlineRegex.exec(text)) !== null) {
+        const letterIdx = m[0].search(/[A-Da-dأابجد]/);
+        const realIndex = m.index + letterIdx;
+        const rawChar = m[1];
+        const arabicOptMap = { 'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D' };
+        const normKey = arabicOptMap[rawChar] || rawChar.toUpperCase();
+        matches.push({
+          key: normKey,
+          realIndex: realIndex,
+          contentStart: m.index + m[0].length
+        });
+      }
+
+      if (matches.length >= 2 && matches[0].realIndex <= 3) {
         const parts = [];
         for (let i = 0; i < matches.length; i++) {
-          const key = matches[i][1].toUpperCase();
-          const start = matches[i].index + matches[i][0].length;
-          const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-          parts.push({ key, text: text.slice(start, end).trim() });
+          const end = i + 1 < matches.length ? matches[i + 1].realIndex : text.length;
+          parts.push({
+            key: matches[i].key,
+            text: text.slice(matches[i].contentStart, end).trim()
+          });
         }
         return parts;
       }
       return null;
+    }
+
+    function renderHtmlTableForQuestion(tableEl) {
+      const rows = Array.from(tableEl.querySelectorAll('tr'));
+      if (rows.length === 0) return '';
+      let html = '<div class="overflow-x-auto my-2"><table class="min-w-full border-collapse border border-slate-300 text-xs sm:text-sm bg-white rounded-lg overflow-hidden">';
+      rows.forEach((tr, rIdx) => {
+        const cells = Array.from(tr.querySelectorAll('td, th'));
+        html += `<tr class="${rIdx === 0 ? 'bg-slate-100 font-bold text-slate-900' : 'border-t border-slate-200'}">`;
+        cells.forEach(cell => {
+          const tag = rIdx === 0 ? 'th' : 'td';
+          const cellImgs = Array.from(cell.querySelectorAll('img')).map(img => `<img src="${img.src}" class="max-h-24 my-1 rounded">`).join('');
+          html += `<${tag} class="border border-slate-300 px-3 py-1.5 text-left arabic-aware">${extractFormattedHtmlText(cell)}${cellImgs}</${tag}>`;
+        });
+        html += '</tr>';
+      });
+      html += '</table></div>';
+      return html;
     }
 
     function finalizeQuestionOptions(qObj) {
@@ -2237,7 +2277,8 @@
         const optLines = qObj._unlabeledLines.slice(-4);
         const extraQuestionLines = qObj._unlabeledLines.slice(0, -4);
         extraQuestionLines.forEach(item => {
-          if (item.text) qObj.question = `${qObj.question} ${item.text}`.trim();
+          if (item.html) qObj.question = `${qObj.question}<br>${item.html}`.trim();
+          else if (item.text) qObj.question = `${qObj.question}<br>${item.text}`.trim();
           if (item.img && !qObj.image) qObj.image = item.img;
         });
         ['A', 'B', 'C', 'D'].forEach((key, idx) => {
@@ -2246,10 +2287,19 @@
         });
       } else if (qObj._unlabeledLines && qObj._unlabeledLines.length > 0) {
         qObj._unlabeledLines.forEach(item => {
-          if (item.text) qObj.question = `${qObj.question} ${item.text}`.trim();
+          if (item.html) qObj.question = `${qObj.question}<br>${item.html}`.trim();
+          else if (item.text) qObj.question = `${qObj.question}<br>${item.text}`.trim();
           if (item.img && !qObj.image) qObj.image = item.img;
         });
       }
+      // Pastikan seluruh opsi A-D terisi minimal string kosong/strip yang valid
+      ['A', 'B', 'C', 'D'].forEach(k => {
+        if (!qObj.options[k] && !(qObj.optionImages && qObj.optionImages[k])) {
+          qObj.options[k] = '-';
+        } else if (!qObj.options[k] && qObj.optionImages && qObj.optionImages[k]) {
+          qObj.options[k] = '';
+        }
+      });
       delete qObj._unlabeledLines;
     }
 
@@ -2262,34 +2312,88 @@
         Array.from(parent.children).forEach(el => {
           const tag = el.tagName;
           if (tag === 'TABLE') {
-            Array.from(el.querySelectorAll('tr')).forEach(tr => {
+            const rows = Array.from(el.querySelectorAll('tr'));
+            const firstRowCells = rows[0] ? Array.from(rows[0].querySelectorAll('td, th')) : [];
+            const firstCellText = firstRowCells[0] ? extractFormattedHtmlText(firstRowCells[0]) : '';
+            
+            // Cek apakah tabel merupakan layout soal (kolom 1 berisi nomor 1. atau A.)
+            const isLayoutTable = firstRowCells.length >= 2 && /^(\d+[\.\)]?|[A-Da-d][\.\)]?)$/.test(firstCellText);
+            // Cek apakah tabel merupakan grid opsi 2x2 (misal: kolom 1 = A. ..., kolom 2 = C. ...)
+            const isOptionGridTable = rows.some(tr => {
               const cells = Array.from(tr.querySelectorAll('td, th'));
-              if (cells.length >= 2) {
-                const c0 = extractFormattedHtmlText(cells[0]);
-                const c1 = extractFormattedHtmlText(cells[1]);
-                const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
-                if (/^(\d+[\.\)]?|[A-Da-d][\.\)]?)$/.test(c0)) {
-                  const sep = /[\.\)]$/.test(c0) ? ' ' : '. ';
-                  blocks.push({ text: `${c0}${sep}${c1}`.trim(), imgs, isListItem: false });
-                  return;
-                }
-              }
-              const text = extractFormattedHtmlText(tr);
-              const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
-              if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+              return cells.length >= 2 && cells.every(c => /^[\(\[]?[A-Da-dأابجد][\.\)\]]/.test(extractFormattedHtmlText(c)));
             });
+            // Cek apakah tabel merupakan tabel kunci jawaban di akhir dokumen
+            const isKeyTable = rows.length >= 2 && rows.every(tr => {
+              const cells = Array.from(tr.querySelectorAll('td, th')).map(c => extractFormattedHtmlText(c));
+              return cells.some(c => /^\d{1,3}[\.\)]?$/.test(c)) && cells.some(c => /^[A-Da-d]$/.test(c));
+            });
+
+            if (isKeyTable) {
+              rows.forEach(tr => {
+                const cells = Array.from(tr.querySelectorAll('td, th')).map(c => extractFormattedHtmlText(c));
+                for (let c = 0; c < cells.length - 1; c++) {
+                  const numM = cells[c].match(/^(\d{1,3})[\.\)]?$/);
+                  const keyM = cells[c + 1].match(/^([A-Da-d])$/i);
+                  if (numM && keyM) {
+                    blocks.push({ text: `${numM[1]}. ${keyM[1].toUpperCase()}`, imgs: [], isKeyHint: true });
+                  }
+                }
+              });
+            } else if (isOptionGridTable) {
+              rows.forEach(tr => {
+                Array.from(tr.querySelectorAll('td, th')).forEach(cell => {
+                  const text = extractFormattedHtmlText(cell);
+                  const imgs = Array.from(cell.querySelectorAll('img')).map(i => i.src);
+                  if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+                });
+              });
+            } else if (isLayoutTable) {
+              rows.forEach(tr => {
+                const cells = Array.from(tr.querySelectorAll('td, th'));
+                if (cells.length >= 2) {
+                  const c0 = extractFormattedHtmlText(cells[0]);
+                  const c1 = extractFormattedHtmlText(cells[1]);
+                  const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
+                  if (/^(\d+[\.\)]?|[A-Da-d][\.\)]?)$/.test(c0)) {
+                    const sep = /[\.\)]$/.test(c0) ? ' ' : '. ';
+                    blocks.push({ text: `${c0}${sep}${c1}`.trim(), imgs, isListItem: false });
+                    return;
+                  }
+                }
+                const text = extractFormattedHtmlText(tr);
+                const imgs = Array.from(tr.querySelectorAll('img')).map(i => i.src);
+                if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+              });
+            } else {
+              const tableHtml = renderHtmlTableForQuestion(el);
+              const imgs = Array.from(el.querySelectorAll('img')).map(i => i.src);
+              if (tableHtml) blocks.push({ text: '', htmlContent: tableHtml, imgs, isTableContent: true });
+            }
           } else if (tag === 'OL' || tag === 'UL') {
             Array.from(el.children).forEach(li => {
               if (li.tagName === 'LI') {
-                const text = extractFormattedHtmlText(li);
+                const rawText = extractFormattedHtmlText(li);
                 const imgs = Array.from(li.querySelectorAll('img')).map(i => i.src);
-                if (text || imgs.length) blocks.push({ text, imgs, isListItem: true });
+                // Pecah jika di dalam satu <li> terdapat Shift+Enter (baris baru)
+                const subLines = rawText.split('\n').map(s => s.trim()).filter(Boolean);
+                if (subLines.length > 1) {
+                  subLines.forEach((sl, idx) => blocks.push({ text: sl, imgs: idx === 0 ? imgs : [], isListItem: true }));
+                } else if (rawText || imgs.length) {
+                  blocks.push({ text: rawText, imgs, isListItem: true });
+                }
               }
             });
           } else if (tag === 'P' || /^H[1-6]$/.test(tag)) {
-            const text = extractFormattedHtmlText(el);
+            const rawText = extractFormattedHtmlText(el);
             const imgs = Array.from(el.querySelectorAll('img')).map(i => i.src);
-            if (text || imgs.length) blocks.push({ text, imgs, isListItem: false });
+            // Pecah paragraf yang memakai Soft Return (Shift+Enter) menjadi baris-baris logis
+            const subLines = rawText.split('\n').map(s => s.trim()).filter(Boolean);
+            if (subLines.length > 1) {
+              subLines.forEach((sl, idx) => blocks.push({ text: sl, imgs: idx === 0 ? imgs : [], isListItem: false }));
+            } else if (rawText || imgs.length) {
+              blocks.push({ text: rawText, imgs, isListItem: false });
+            }
           } else {
             walkNodes(el);
           }
@@ -2302,13 +2406,32 @@
       let lastTarget = 'question';
       let lastOptionKey = null;
       let pendingImagesBeforeNextQ = [];
+      let pendingStimulusText = [];
       const arabicOptMap = { 'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D' };
 
       blocks.forEach(block => {
+        if (block.isKeyHint) return;
+
+        if (block.isTableContent) {
+          if (currentQ) {
+            currentQ._unlabeledLines.push({ text: '', html: block.htmlContent, img: '' });
+          } else {
+            pendingStimulusText.push(block.htmlContent);
+          }
+          return;
+        }
+
         let line = normalizeDigits(block.text || '').trim();
         const imgs = block.imgs || [];
 
+        // Tangkap wacana/bacaan pengantar sebelum nomor soal jika diawali kata kunci bacaan
         if (!currentQ && line && !/^(?:soal\s*)?(\d+)[\.\)\:\-]/i.test(line)) {
+          if (/^(?:bacalah|perhatikan\s+teks|wacana|cerita|teks\s+berikut)/i.test(line) || pendingStimulusText.length > 0) {
+            // Jangan tangkap header dokumen seperti "SOAL PENDIDIKAN AGAMA..." atau "Bab 1"
+            if (!/^(?:bab\s+\d+|pilihlah\s+jawaban|nama\s*:|kelas\s*:|hari\/tanggal)/i.test(line)) {
+              pendingStimulusText.push(line);
+            }
+          }
           if (imgs.length > 0) pendingImagesBeforeNextQ.push(...imgs);
           return;
         }
@@ -2324,7 +2447,7 @@
           currentQ.question.length > 0 &&
           (currentQ._unlabeledLines.length > 0 || ['A','B','C','D'].some(k => currentQ.options[k])) &&
           parseInt(qMatch[1], 10) <= 4 &&
-          qMatch[2].length < 40;
+          qMatch[2].length < 45;
 
         if (keyMatch && currentQ) {
           const rawKey = keyMatch[1];
@@ -2340,9 +2463,10 @@
             finalizeQuestionOptions(currentQ);
             parsedDocxQuestions.push(currentQ);
           }
+          const stimulusPrefix = pendingStimulusText.length > 0 ? `${pendingStimulusText.join('<br>')}<br>` : '';
           currentQ = {
             id: parseInt(qMatch[1], 10),
-            question: qMatch[2].trim(),
+            question: `${stimulusPrefix}${qMatch[2].trim()}`.trim(),
             image: pendingImagesBeforeNextQ[0] || imgs[0] || '',
             options: {},
             optionImages: {},
@@ -2351,6 +2475,7 @@
             _unlabeledLines: []
           };
           pendingImagesBeforeNextQ = [];
+          pendingStimulusText = [];
           lastTarget = 'question';
           lastOptionKey = null;
         } else if (optMatch && currentQ) {
@@ -2426,11 +2551,12 @@
         parsedDocxQuestions.push(currentQ);
       }
 
+      // Tangkap kunci jawaban apabila ditulis terpisah di akhir dokumen (misal: "1. B  2. C" atau tabel kunci)
       const trailingKeyMap = {};
       blocks.forEach(block => {
         const txt = normalizeDigits(block.text || '').trim();
         const pairMatches = [...txt.matchAll(/(?:^|\s|;)(\d{1,3})\s*[\.\)\:\-\=]\s*[\(\[]?([A-Da-dأابجد])[\)\]\.]?(?=\s|$|,|;)/g)];
-        if (pairMatches.length >= 1 && txt.length < 180) {
+        if (pairMatches.length >= 1 && txt.length < 220) {
           pairMatches.forEach(m => {
             const qNum = parseInt(m[1], 10);
             const rawK = m[2];

@@ -232,512 +232,6 @@
 </head>
 <body class="text-slate-800 bg-slate-100 antialiased selection:bg-amber-400 selection:text-slate-900">
 
-  <!-- ==================== CORE APPLICATION & FIREBASE MODULE ==================== -->
-  <script type="module">
-    // PENTING: Ubah menjadi false saat dipasang di GitHub & Netlify
-    const IS_PREVIEW = false; 
-
-    // Konfigurasi Firebase Project asas011
-    const firebaseConfig = {
-      apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
-      authDomain: "asas011.firebaseapp.com",
-      projectId: "asas011",
-      storageBucket: "asas011.firebasestorage.app",
-      messagingSenderId: "625005082543",
-      appId: "1:625005082543:web:5b44953d682487c9e9e15a"
-    };
-
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { 
-      getAuth, 
-      signInWithEmailAndPassword, 
-      signInAnonymously,
-      signInWithCustomToken,
-      signOut, 
-      onAuthStateChanged 
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { 
-      getFirestore, 
-      doc, 
-      getDoc, 
-      setDoc, 
-      addDoc, 
-      updateDoc, 
-      deleteDoc, 
-      collection, 
-      getDocs 
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE_NAME = 'sas-sdn011-v3';
-        self.addEventListener('install', (e) => self.skipWaiting());
-        self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-        self.addEventListener('fetch', (e) => {
-          e.respondWith(fetch(e.request).catch(() => new Response('Offline Mode')));
-        });
-      `;
-      const swBlob = new Blob([swCode], { type: 'application/javascript' });
-      const swUrl = URL.createObjectURL(swBlob);
-      navigator.serviceWorker.register(swUrl).catch(() => {});
-    }
-
-    window.SAS_APP = {
-      IS_PREVIEW,
-      app: null,
-      db: null,
-      auth: null,
-      appId: typeof __app_id !== 'undefined' ? __app_id : 'sdn011-sangatta-selatan',
-      currentUser: null,
-      userProfile: null,
-      activeExam: null,
-      examAnswers: {},
-      examDoubts: {},
-      examTimer: null,
-      timeLeft: 0,
-      currentQuestionIdx: 0,
-      tabViolations: 0,
-      maxTabViolations: 3,
-
-      classes: ['3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B'],
-      subjects: [
-        'Bahasa Indonesia', 'Matematika', 'IPAS', 'PJOK', 
-        'Pendidikan Pancasila', 'Bahasa Inggris', 'Pendidikan Agama', 'Seni Budaya',
-        'Koding', 'Bahasa Kutai'
-      ],
-
-      data: {
-        teachers: [],
-        students: [],
-        exams: [],
-        results: []
-      }
-    };
-
-    function loadPreviewDummyData() {
-      if (!IS_PREVIEW) return;
-      window.SAS_APP.data.teachers = [
-        { id: 't3a', username: 'guru3a', password: '123', name: 'Siti Aminah, S.Pd', class: '3A', role: 'guru' },
-        { id: 't4a', username: 'guru4a', password: '123', name: 'Dewi Sartika, S.Pd', class: '4A', role: 'guru' }
-      ];
-      window.SAS_APP.data.students = [
-        { id: 's1', name: 'Aditya Pratama', class: '3A' },
-        { id: 's2', name: 'Aisyah Putri', class: '3A' }
-      ];
-      window.SAS_APP.data.exams = [
-        {
-          id: 'ex-3a-mat',
-          title: 'Asesmen Akhir Semester Matematika 3A',
-          subject: 'Matematika',
-          targetClass: '3A',
-          duration: 30,
-          status: 'aktif',
-          createdBy: 'guru3a',
-          questions: [
-            {
-              id: 1,
-              question: 'Hasil dari 125 + 275 adalah...',
-              options: { A: '350', B: '375', C: '400', D: '425' },
-              answer: 'C'
-            },
-            {
-              id: 2,
-              question: 'Sebuah persegi memiliki panjang sisi 8 cm. Keliling persegi tersebut adalah...',
-              options: { A: '16 cm', B: '24 cm', C: '32 cm', D: '64 cm' },
-              answer: 'C'
-            }
-          ]
-        }
-      ];
-      window.SAS_APP.data.results = [
-        {
-          id: 'res-1',
-          examId: 'ex-3a-mat',
-          examTitle: 'Asesmen Akhir Semester Matematika 3A',
-          studentId: 's1',
-          studentName: 'Aditya Pratama',
-          studentClass: '3A',
-          subject: 'Matematika',
-          score: 100,
-          correctCount: 2,
-          totalQuestions: 2,
-          studentAnswers: { 0: 'C', 1: 'C' },
-          completedAt: '12/11/2026 09:30'
-        }
-      ];
-    }
-
-    function getPublicCollectionRef(colName) {
-      return collection(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName);
-    }
-
-    function getPublicDocRef(colName, docId) {
-      return doc(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName, docId);
-    }
-
-    async function ensureAuthenticatedSession() {
-      if (IS_PREVIEW || !window.SAS_APP.auth) return;
-      if (!window.SAS_APP.auth.currentUser) {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(window.SAS_APP.auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(window.SAS_APP.auth);
-        }
-      }
-    }
-
-    async function initProductionFirebase() {
-      if (IS_PREVIEW) return;
-
-      const activeConfig = (typeof __firebase_config !== 'undefined') 
-        ? JSON.parse(__firebase_config) 
-        : firebaseConfig;
-
-      if (!activeConfig.apiKey || activeConfig.apiKey === "API_KEY_ANDA") {
-        console.error("Konfigurasi Firebase belum diisi!");
-        setTimeout(() => {
-          window.showNotify(
-            "Konfigurasi Firebase Belum Diisi",
-            "Silakan ganti placeholder firebaseConfig di dalam kode HTML dengan konfigurasi dari Firebase Console Anda.",
-            true
-          );
-        }, 500);
-        return;
-      }
-
-      window.SAS_APP.app = initializeApp(activeConfig);
-      window.SAS_APP.db = getFirestore(window.SAS_APP.app);
-      window.SAS_APP.auth = getAuth(window.SAS_APP.app);
-
-      try {
-        await ensureAuthenticatedSession();
-      } catch (err) {
-        console.error("Gagal login anonim Firebase:", err);
-        window.showNotify(
-          "Autentikasi Anonymous Belum Aktif",
-          "Pastikan metode login 'Anonymous' dan 'Email/Password' sudah diaktifkan di Firebase Console > Authentication > Sign-in method.",
-          true
-        );
-      }
-
-      onAuthStateChanged(window.SAS_APP.auth, async (user) => {
-        if (user) {
-          if (!user.isAnonymous && user.email) {
-            window.SAS_APP.currentUser = {
-              id: user.uid,
-              username: user.email,
-              name: 'Panitia SAS (Admin)',
-              role: 'admin'
-            };
-            window.updateLoggedInUI();
-          }
-          await window.syncInitialPublicData();
-        }
-      });
-    }
-
-    window.fetchClassRosterFromFirestore = async function(className) {
-      if (IS_PREVIEW || !window.SAS_APP.db || !className) return;
-      try {
-        await ensureAuthenticatedSession();
-        const docSnap = await getDoc(getPublicDocRef('rosters', className));
-        if (docSnap.exists() && Array.isArray(docSnap.data().list)) {
-          const classStudents = docSnap.data().list.map(stu => ({
-            id: stu.id,
-            name: stu.name,
-            class: className
-          }));
-          window.SAS_APP.data.students = [
-            ...window.SAS_APP.data.students.filter(s => s.class !== className),
-            ...classStudents
-          ];
-        } else {
-          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.class !== className);
-        }
-      } catch (err) {
-        console.error(`Gagal mengambil roster kelas ${className}:`, err);
-      }
-    };
-
-    window.syncInitialPublicData = async function() {
-      if (IS_PREVIEW || !window.SAS_APP.db) return;
-      try {
-        await ensureAuthenticatedSession();
-        const [rostersSnap, examsSnap] = await Promise.all([
-          getDocs(getPublicCollectionRef('rosters')),
-          getDocs(getPublicCollectionRef('exams'))
-        ]);
-
-        let allStudents = [];
-        rostersSnap.forEach(docSnap => {
-          const d = docSnap.data();
-          if (Array.isArray(d.list)) {
-            d.list.forEach(stu => {
-              allStudents.push({ id: stu.id, name: stu.name, class: docSnap.id });
-            });
-          }
-        });
-        window.SAS_APP.data.students = allStudents;
-        window.SAS_APP.data.exams = examsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        if (window.SAS_APP.currentUser) {
-          await window.syncStaffData();
-        }
-        refreshCurrentActiveView();
-      } catch (err) {
-        console.error("Gagal sinkronisasi awal:", err);
-      }
-    };
-
-    window.syncStaffData = async function() {
-      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
-      try {
-        await ensureAuthenticatedSession();
-        const tasks = [getDocs(getPublicCollectionRef('results'))];
-        if (window.SAS_APP.currentUser.role === 'admin') {
-          tasks.push(getDocs(getPublicCollectionRef('teachers')));
-        }
-        const [resultsSnap, teachersSnap] = await Promise.all(tasks);
-        window.SAS_APP.data.results = resultsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (teachersSnap) {
-          window.SAS_APP.data.teachers = teachersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
-      } catch (err) {
-        console.error("Gagal memuat data staf:", err);
-      }
-    };
-
-    function refreshCurrentActiveView() {
-      window.populateClassDropdowns();
-      const activeSection = document.querySelector('.view-section:not(.hidden)');
-      if (!activeSection) return;
-      const id = activeSection.id;
-      if (id === 'home-view' && document.getElementById('student-select-class')?.value) {
-        window.onStudentClassChange();
-      }
-      if (id === 'dashboard-view') window.renderDashboard();
-      if (id === 'rekap-view') window.renderRekapTable();
-      if (id === 'users-view') window.renderUsersManagement();
-    }
-
-    window.DB_SERVICE = {
-      async loginAdmin(email, password) {
-        if (IS_PREVIEW) {
-          if ((email === 'admin' || email === 'admin@sdn011.sch.id') && password === '123') {
-            return { id: 'admin-demo', username: 'admin', name: 'Panitia SAS (Admin)', role: 'admin' };
-          }
-          throw new Error('Email/Username atau Password Admin salah.');
-        } else {
-          const userCred = await signInWithEmailAndPassword(window.SAS_APP.auth, email, password);
-          return {
-            id: userCred.user.uid,
-            username: userCred.user.email,
-            name: 'Panitia SAS (Admin)',
-            role: 'admin'
-          };
-        }
-      },
-
-      async loginTeacher(username, password) {
-        if (IS_PREVIEW) {
-          const found = window.SAS_APP.data.teachers.find(
-            t => t.username.toLowerCase() === username.toLowerCase() && t.password === password
-          );
-          if (!found) throw new Error('Username atau Password Guru tidak cocok.');
-          return found;
-        } else {
-          await ensureAuthenticatedSession();
-          const snap = await getDocs(getPublicCollectionRef('teachers'));
-          const teachersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const found = teachersList.find(
-            t => t.username && t.username.toLowerCase() === username.toLowerCase() && t.password === password
-          );
-          if (!found) throw new Error('Username atau Password Guru tidak terdaftar di database.');
-          return { ...found, role: 'guru' };
-        }
-      },
-
-      async logoutUser() {
-        if (!IS_PREVIEW && window.SAS_APP.auth) {
-          await signOut(window.SAS_APP.auth);
-          await signInAnonymously(window.SAS_APP.auth);
-        }
-      },
-
-      async addExam(examPayload) {
-        if (IS_PREVIEW) {
-          const newDoc = { id: 'ex-' + Date.now(), ...examPayload };
-          window.SAS_APP.data.exams.push(newDoc);
-          return newDoc;
-        } else {
-          await ensureAuthenticatedSession();
-          const docRef = await addDoc(getPublicCollectionRef('exams'), examPayload);
-          const created = { id: docRef.id, ...examPayload };
-          window.SAS_APP.data.exams.push(created);
-          return created;
-        }
-      },
-
-      async toggleExamStatus(examId, newStatus) {
-        if (IS_PREVIEW) {
-          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
-          if (ex) ex.status = newStatus;
-        } else {
-          await ensureAuthenticatedSession();
-          await updateDoc(getPublicDocRef('exams', examId), { status: newStatus });
-          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
-          if (ex) ex.status = newStatus;
-        }
-      },
-
-      async updateExamSchedule(examId, startTime, endTime) {
-        if (IS_PREVIEW) {
-          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
-          if (ex) {
-            ex.startTime = startTime || '';
-            ex.endTime = endTime || '';
-          }
-        } else {
-          await ensureAuthenticatedSession();
-          await updateDoc(getPublicDocRef('exams', examId), {
-            startTime: startTime || '',
-            endTime: endTime || ''
-          });
-          const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
-          if (ex) {
-            ex.startTime = startTime || '';
-            ex.endTime = endTime || '';
-          }
-        }
-      },
-
-      async deleteExam(examId) {
-        if (IS_PREVIEW) {
-          window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
-        } else {
-          await ensureAuthenticatedSession();
-          await deleteDoc(getPublicDocRef('exams', examId));
-          window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
-        }
-      },
-
-      async submitExamResult(resultPayload) {
-        if (IS_PREVIEW) {
-          const newRes = { id: 'res-' + Date.now(), ...resultPayload };
-          window.SAS_APP.data.results.push(newRes);
-          return newRes;
-        } else {
-          await ensureAuthenticatedSession();
-          const uniqueResId = `${resultPayload.examId}_${resultPayload.studentId}`;
-          await setDoc(getPublicDocRef('results', uniqueResId), resultPayload);
-          const saved = { id: uniqueResId, ...resultPayload };
-          window.SAS_APP.data.results.push(saved);
-          return saved;
-        }
-      },
-
-      async checkStudentAlreadySubmitted(examId, studentId) {
-        if (IS_PREVIEW) {
-          return window.SAS_APP.data.results.some(r => r.examId === examId && r.studentId === studentId);
-        } else {
-          await ensureAuthenticatedSession();
-          const snap = await getDoc(getPublicDocRef('results', `${examId}_${studentId}`));
-          return snap.exists();
-        }
-      },
-
-      async saveClassRoster(className, studentNamesArray) {
-        const cleanList = studentNamesArray
-          .map((name, idx) => ({
-            id: `stu_${className}_${Date.now()}_${idx}`,
-            name: name.trim()
-          }))
-          .filter(item => item.name.length > 0);
-
-        if (IS_PREVIEW) {
-          const existing = window.SAS_APP.data.students.filter(s => s.class === className);
-          const merged = [
-            ...existing,
-            ...cleanList.map(c => ({ id: c.id, name: c.name, class: className }))
-          ];
-          window.SAS_APP.data.students = [
-            ...window.SAS_APP.data.students.filter(s => s.class !== className),
-            ...merged
-          ];
-        } else {
-          await window.fetchClassRosterFromFirestore(className);
-          const existing = window.SAS_APP.data.students
-            .filter(s => s.class === className)
-            .map(s => ({ id: s.id, name: s.name }));
-          const merged = [...existing, ...cleanList];
-          
-          await setDoc(getPublicDocRef('rosters', className), {
-            class: className,
-            list: merged,
-            updatedAt: new Date().toISOString()
-          });
-          
-          window.SAS_APP.data.students = [
-            ...window.SAS_APP.data.students.filter(s => s.class !== className),
-            ...merged.map(m => ({ id: m.id, name: m.name, class: className }))
-          ];
-        }
-      },
-
-      async deleteStudent(studentId, className) {
-        if (IS_PREVIEW) {
-          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.id !== studentId);
-        } else {
-          const remaining = window.SAS_APP.data.students
-            .filter(s => s.class === className && s.id !== studentId)
-            .map(s => ({ id: s.id, name: s.name }));
-          await setDoc(getPublicDocRef('rosters', className), {
-            class: className,
-            list: remaining,
-            updatedAt: new Date().toISOString()
-          });
-          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.id !== studentId);
-        }
-      },
-
-      async addTeacher(teacherPayload) {
-        if (IS_PREVIEW) {
-          const newTeacher = { id: 't-' + Date.now(), ...teacherPayload, role: 'guru' };
-          window.SAS_APP.data.teachers.push(newTeacher);
-          return newTeacher;
-        } else {
-          const docRef = await addDoc(getPublicCollectionRef('teachers'), { ...teacherPayload, role: 'guru' });
-          const created = { id: docRef.id, ...teacherPayload, role: 'guru' };
-          window.SAS_APP.data.teachers.push(created);
-          return created;
-        }
-      },
-
-      async deleteTeacher(teacherId) {
-        if (IS_PREVIEW) {
-          window.SAS_APP.data.teachers = window.SAS_APP.data.teachers.filter(t => t.id !== teacherId);
-        } else {
-          await deleteDoc(getPublicDocRef('teachers', teacherId));
-          window.SAS_APP.data.teachers = window.SAS_APP.data.teachers.filter(t => t.id !== teacherId);
-        }
-      }
-    };
-
-    window.addEventListener('DOMContentLoaded', async () => {
-      window.safeCreateIcons();
-
-      if (IS_PREVIEW) {
-        loadPreviewDummyData();
-      } else {
-        await initProductionFirebase();
-      }
-
-      window.populateClassDropdowns();
-      window.updateNavigationVisibility();
-      window.switchView('home-view');
-    });
-  </script>
-
   <!-- ==================== APP SHELL FULLPAGE WRAPPER ==================== -->
   <div id="app-shell" class="flex flex-col min-h-screen bg-slate-100 pb-24 md:pb-0 overflow-x-hidden">
 
@@ -1083,7 +577,7 @@
               Daftar Paket Asesmen Terdaftar
             </h3>
             <div class="overflow-x-auto -mx-4 sm:mx-0">
-              <table class="w-full text-left text-xs text-slate-700 min-w-[740px]">
+              <table class="w-full text-left text-xs text-slate-700 min-w-[780px]">
                 <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
                   <tr>
                     <th class="py-3 px-4">Judul Asesmen</th>
@@ -1134,15 +628,15 @@
                 </div>
               </div>
 
-              <!-- Pengaturan Jadwal Ujian (Kunci Otomatis Sebelum Jadwal) -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-amber-50/70 p-3.5 sm:p-4 rounded-xl border border-amber-200">
+              <!-- Pengaturan Jadwal Ujian & Pengacakan Soal -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 bg-amber-50/70 p-3.5 sm:p-4 rounded-xl border border-amber-200">
                 <div>
                   <label class="block text-xs font-bold text-slate-800 uppercase mb-1 flex items-center gap-1.5">
                     <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-brand-gold"></i>
-                    Jadwal Mulai Ujian (Kunci Otomatis)
+                    Jadwal Mulai Ujian
                   </label>
                   <input type="datetime-local" id="exam-input-start-time" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
-                  <p class="text-[10px] text-slate-500 mt-1">Siswa tidak dapat menekan "Mulai Ujian" sebelum waktu ini tiba.</p>
+                  <p class="text-[10px] text-slate-500 mt-1">Terkunci otomatis sebelum waktu ini.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-800 uppercase mb-1 flex items-center gap-1.5">
@@ -1150,7 +644,16 @@
                     Batas Akhir Akses (Opsional)
                   </label>
                   <input type="datetime-local" id="exam-input-end-time" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
-                  <p class="text-[10px] text-slate-500 mt-1">Kosongkan jika tidak ada batas penutupan otomatis.</p>
+                  <p class="text-[10px] text-slate-500 mt-1">Kosongkan jika tanpa batas akhir.</p>
+                </div>
+                <div class="flex flex-col justify-center">
+                  <label class="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-amber-300 cursor-pointer select-none shadow-xs">
+                    <input type="checkbox" id="exam-input-randomize" class="mt-0.5 rounded text-brand-gold focus:ring-brand-gold w-4 h-4">
+                    <div>
+                      <span class="block text-xs font-extrabold text-slate-900">Acak Urutan Soal per Siswa</span>
+                      <span class="block text-[10px] text-slate-500 mt-0.5">Nomor soal tampil acak di layar siswa, namun analisis butir tetap sesuai nomor master.</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 
@@ -1201,6 +704,9 @@
                 <button onclick="exportResultsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2 transition">
                   <i data-lucide="download" class="w-4 h-4"></i> Ekspor Excel (.xls)
                 </button>
+                <button onclick="confirmBulkResetResults()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center justify-center gap-2 transition">
+                  <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Hasil Simulasi
+                </button>
               </div>
             </div>
 
@@ -1220,9 +726,12 @@
               </div>
             </div>
 
+            <!-- Pemantau Status Ujian Siswa (Sudah Ujian vs Belum Ujian) -->
+            <div id="student-completion-monitor" class="mb-4 hidden"></div>
+
             <!-- Tabel Hasil Rekap -->
             <div class="overflow-x-auto -mx-4 sm:mx-0">
-              <table class="w-full text-left text-xs text-slate-700 min-w-[580px]">
+              <table class="w-full text-left text-xs text-slate-700 min-w-[640px]">
                 <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
                   <tr>
                     <th class="py-3 px-4">No</th>
@@ -1232,6 +741,7 @@
                     <th class="py-3 px-4">Benar</th>
                     <th class="py-3 px-4">Skor</th>
                     <th class="py-3 px-4">Waktu Selesai</th>
+                    <th class="py-3 px-4 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="rekap-tbody" class="divide-y divide-slate-100">
@@ -1380,7 +890,7 @@
   </nav>
 
   <!-- ==================== MODAL PORTAL LOGIN (HYBRID AUTH) ==================== -->
-  <div id="login-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div id="login-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
       <button onclick="closeLoginModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
         <i data-lucide="x" class="w-5 h-5"></i>
@@ -1429,7 +939,7 @@
   </div>
 
   <!-- ==================== CUSTOM NOTIFICATION & CONFIRMATION MODAL ==================== -->
-  <div id="custom-dialog-modal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div id="custom-dialog-modal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center space-y-4">
       <div id="dialog-icon-wrap" class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
         <i data-lucide="alert-circle" class="w-6 h-6"></i>
@@ -1450,7 +960,7 @@
   </div>
 
   <!-- ==================== OVERLAY PENGAWAS FULLSCREEN & PINDAH TAB UJIAN ==================== -->
-  <div id="exam-security-overlay" class="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md hidden flex items-center justify-center p-4">
+  <div id="exam-security-overlay" class="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md hidden items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border-2 border-rose-500 text-center space-y-5">
       <div class="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
         <i data-lucide="shield-alert" class="w-9 h-9"></i>
@@ -1474,7 +984,7 @@
   </div>
 
   <!-- ==================== MODAL ATUR JADWAL UJIAN (GURU / ADMIN) ==================== -->
-  <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
       <button onclick="closeScheduleModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
         <i data-lucide="x" class="w-5 h-5"></i>
@@ -1512,8 +1022,43 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL EDIT SOAL & KUNCI JAWABAN ==================== -->
+  <div id="edit-questions-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6">
+    <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden relative">
+      <div class="p-4 sm:p-5 bg-brand-navy text-white flex items-center justify-between border-b border-slate-700 shrink-0">
+        <div>
+          <h3 id="edit-questions-title" class="text-sm sm:text-base font-extrabold text-white">Edit Soal & Kunci Jawaban</h3>
+          <p class="text-[11px] text-amber-400">Perbaiki teks pertanyaan, pilihan A–D, kunci jawaban, atau pengaturan acak soal tanpa perlu unggah ulang Word.</p>
+        </div>
+        <button onclick="closeEditQuestionsModal()" class="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <input type="hidden" id="edit-exam-id">
+        <label class="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+          <input type="checkbox" id="edit-exam-randomize" class="rounded text-brand-gold focus:ring-brand-gold w-4 h-4">
+          <span>Acak Urutan Soal per Siswa</span>
+        </label>
+        <button type="button" onclick="recalculateExamScores()" id="btn-recalc-scores" class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5">
+          <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Hitung Ulang Nilai Siswa Terdampak
+        </button>
+      </div>
+
+      <div id="edit-questions-list" class="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 flex-grow">
+        <!-- Injected via JS -->
+      </div>
+
+      <div class="p-4 bg-slate-100 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" onclick="closeEditQuestionsModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl">Batal</button>
+        <button type="button" onclick="saveEditedQuestions()" id="btn-save-edited-questions" class="bg-brand-navy hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">Simpan Perubahan Soal</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL REKAP ANALISIS JAWABAN BUTIR SOAL ==================== -->
-  <div id="analysis-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6">
+  <div id="analysis-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6">
     <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden relative">
       <!-- Modal Header -->
       <div class="p-4 sm:p-6 bg-brand-navy text-white flex items-center justify-between border-b border-slate-700 shrink-0">
@@ -1584,6 +1129,19 @@
       }
     };
 
+    function normalizeIdentityStr(str) {
+      return String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function escapeHtmlAttr(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
     window.showNotify = function(title, message, isError = false) {
       const modal = document.getElementById('custom-dialog-modal');
       const iconWrap = document.getElementById('dialog-icon-wrap');
@@ -1603,6 +1161,7 @@
       okBtn.onclick = () => closeCustomDialog();
 
       modal.classList.remove('hidden');
+      modal.classList.add('flex');
       window.safeCreateIcons();
     };
 
@@ -1623,11 +1182,14 @@
       };
 
       modal.classList.remove('hidden');
+      modal.classList.add('flex');
       window.safeCreateIcons();
     };
 
     window.closeCustomDialog = function() {
-      document.getElementById('custom-dialog-modal').classList.add('hidden');
+      const modal = document.getElementById('custom-dialog-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     };
 
     // ==================== PENGAWAS FULLSCREEN & DETEKSI PINDAH TAB ====================
@@ -1685,12 +1247,15 @@
         ? 'inline-block bg-rose-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-2 animate-pulse'
         : 'inline-block bg-amber-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-2';
       overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
       window.safeCreateIcons();
     }
 
     window.resumeExamFullscreen = async function() {
       await window.enterExamFullscreen();
-      document.getElementById('exam-security-overlay').classList.add('hidden');
+      const overlay = document.getElementById('exam-security-overlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
     };
 
     function registerTabSwitchViolation(reason) {
@@ -1707,7 +1272,9 @@
       window.saveCurrentExamProgress();
 
       if (count >= max) {
-        document.getElementById('exam-security-overlay').classList.add('hidden');
+        const overlay = document.getElementById('exam-security-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
         submitExam(false, `Ujian otomatis dikumpulkan karena terdeteksi meninggalkan halaman ujian sebanyak ${count} kali (${reason}).`);
       } else {
         showSecurityOverlay(
@@ -1791,15 +1358,15 @@
       setTimeout(() => window.safeCreateIcons(), 50);
 
       if (viewId === 'dashboard-view') {
-        await window.syncStaffData();
+        if (typeof window.syncStaffData === 'function') await window.syncStaffData();
         window.renderDashboard();
       }
       if (viewId === 'rekap-view') {
-        await window.syncStaffData();
+        if (typeof window.syncStaffData === 'function') await window.syncStaffData();
         window.renderRekapTable();
       }
       if (viewId === 'users-view') {
-        await window.syncStaffData();
+        if (typeof window.syncStaffData === 'function') await window.syncStaffData();
         window.renderUsersManagement();
       }
       if (viewId === 'import-view') window.populateExamFormDropdowns();
@@ -1832,7 +1399,9 @@
     };
 
     window.handleRefreshStaffData = async function() {
-      await window.syncInitialPublicData();
+      if (typeof window.syncInitialPublicData === 'function') {
+        await window.syncInitialPublicData();
+      }
       showNotify('Data Diperbarui', 'Seluruh data ujian, siswa, dan hasil nilai terbaru telah dimuat dari server.');
     };
 
@@ -1922,7 +1491,7 @@
         nameSelect.innerHTML = '<option value="">Belum ada siswa terdaftar di kelas ini</option>';
       } else {
         nameSelect.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>' +
-          filteredStudents.map(s => `<option value="${s.id}" data-name="${s.name}">${s.name}</option>`).join('');
+          filteredStudents.map(s => `<option value="${s.id}" data-name="${escapeHtmlAttr(s.name)}">${s.name}</option>`).join('');
       }
     };
 
@@ -1989,6 +1558,7 @@
         const payload = {
           examAnswers: window.SAS_APP.examAnswers || {},
           examDoubts: window.SAS_APP.examDoubts || {},
+          questionOrder: window.SAS_APP.questionOrder || null,
           currentQuestionIdx: window.SAS_APP.currentQuestionIdx || 0,
           timeLeft: window.SAS_APP.timeLeft,
           tabViolations: window.SAS_APP.tabViolations || 0,
@@ -2005,6 +1575,15 @@
         localStorage.removeItem(getSavedProgressKey(examId, studentId));
       } catch (e) {}
     };
+
+    function createShuffledIndices(total) {
+      const arr = Array.from({ length: total }, (_, i) => i);
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
 
     window.loadAvailableExamsForStudent = async function() {
       const selectedClass = document.getElementById('student-select-class').value;
@@ -2119,6 +1698,9 @@
         window.SAS_APP.examAnswers = savedProg.examAnswers || {};
         window.SAS_APP.examDoubts = savedProg.examDoubts || {};
         window.SAS_APP.tabViolations = savedProg.tabViolations || 0;
+        window.SAS_APP.questionOrder = (Array.isArray(savedProg.questionOrder) && savedProg.questionOrder.length === exam.questions.length)
+          ? savedProg.questionOrder
+          : (exam.randomizeQuestions ? createShuffledIndices(exam.questions.length) : Array.from({ length: exam.questions.length }, (_, i) => i));
         const maxIdx = Math.max(0, exam.questions.length - 1);
         window.SAS_APP.currentQuestionIdx = Math.min(savedProg.currentQuestionIdx || 0, maxIdx);
         if (typeof savedProg.timeLeft === 'number' && savedProg.timeLeft > 0) {
@@ -2128,6 +1710,9 @@
         window.SAS_APP.examAnswers = {};
         window.SAS_APP.examDoubts = {};
         window.SAS_APP.tabViolations = 0;
+        window.SAS_APP.questionOrder = exam.randomizeQuestions
+          ? createShuffledIndices(exam.questions.length)
+          : Array.from({ length: exam.questions.length }, (_, i) => i);
         window.SAS_APP.currentQuestionIdx = 0;
       }
 
@@ -2191,17 +1776,26 @@
       }).join('<br>');
     }
 
+    function getMasterQuestionIndex(displayIdx) {
+      const order = window.SAS_APP.questionOrder;
+      if (Array.isArray(order) && typeof order[displayIdx] === 'number') {
+        return order[displayIdx];
+      }
+      return displayIdx;
+    }
+
     function renderCurrentQuestion() {
       const exam = window.SAS_APP.activeExam;
-      const idx = window.SAS_APP.currentQuestionIdx;
-      const question = exam.questions[idx];
+      const displayIdx = window.SAS_APP.currentQuestionIdx;
+      const masterIdx = getMasterQuestionIndex(displayIdx);
+      const question = exam.questions[masterIdx];
 
-      document.getElementById('current-question-num').innerText = `${idx + 1} / ${exam.questions.length}`;
-      const qImgHtml = question.image ? `<img src="${question.image}" alt="Gambar Soal ${idx + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">` : '';
-      document.getElementById('question-text').innerHTML = `<div class="arabic-aware">${idx + 1}. ${formatArabicTextHtml(question.question)}</div>${qImgHtml}`;
+      document.getElementById('current-question-num').innerText = `${displayIdx + 1} / ${exam.questions.length}`;
+      const qImgHtml = question.image ? `<img src="${question.image}" alt="Gambar Soal ${displayIdx + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">` : '';
+      document.getElementById('question-text').innerHTML = `<div class="arabic-aware">${displayIdx + 1}. ${formatArabicTextHtml(question.question)}</div>${qImgHtml}`;
 
       const optionsContainer = document.getElementById('options-container');
-      const selectedAnswer = window.SAS_APP.examAnswers[idx];
+      const selectedAnswer = window.SAS_APP.examAnswers[masterIdx];
 
       optionsContainer.innerHTML = ['A', 'B', 'C', 'D'].map(key => {
         const value = question.options[key] || '-';
@@ -2217,22 +1811,22 @@
         `;
       }).join('');
 
-      document.getElementById('doubt-checkbox').checked = !!window.SAS_APP.examDoubts[idx];
-      document.getElementById('btn-prev-question').disabled = idx === 0;
-      document.getElementById('btn-next-question').disabled = idx === exam.questions.length - 1;
+      document.getElementById('doubt-checkbox').checked = !!window.SAS_APP.examDoubts[masterIdx];
+      document.getElementById('btn-prev-question').disabled = displayIdx === 0;
+      document.getElementById('btn-next-question').disabled = displayIdx === exam.questions.length - 1;
     }
 
     window.selectOption = function(key) {
-      const idx = window.SAS_APP.currentQuestionIdx;
-      window.SAS_APP.examAnswers[idx] = key;
+      const masterIdx = getMasterQuestionIndex(window.SAS_APP.currentQuestionIdx);
+      window.SAS_APP.examAnswers[masterIdx] = key;
       window.saveCurrentExamProgress();
       renderCurrentQuestion();
       renderQuestionGrid();
     };
 
     window.toggleDoubtState = function() {
-      const idx = window.SAS_APP.currentQuestionIdx;
-      window.SAS_APP.examDoubts[idx] = document.getElementById('doubt-checkbox').checked;
+      const masterIdx = getMasterQuestionIndex(window.SAS_APP.currentQuestionIdx);
+      window.SAS_APP.examDoubts[masterIdx] = document.getElementById('doubt-checkbox').checked;
       window.saveCurrentExamProgress();
       renderQuestionGrid();
     };
@@ -2247,8 +1841,8 @@
       }
     };
 
-    window.jumpToQuestion = function(idx) {
-      window.SAS_APP.currentQuestionIdx = idx;
+    window.jumpToQuestion = function(displayIdx) {
+      window.SAS_APP.currentQuestionIdx = displayIdx;
       window.saveCurrentExamProgress();
       renderCurrentQuestion();
       renderQuestionGrid();
@@ -2265,10 +1859,11 @@
       const exam = window.SAS_APP.activeExam;
       const gridContainer = document.getElementById('question-grid');
 
-      gridContainer.innerHTML = exam.questions.map((q, idx) => {
-        const isAnswered = window.SAS_APP.examAnswers[idx] !== undefined;
-        const isDoubt = window.SAS_APP.examDoubts[idx];
-        const isCurrent = window.SAS_APP.currentQuestionIdx === idx;
+      gridContainer.innerHTML = exam.questions.map((q, displayIdx) => {
+        const masterIdx = getMasterQuestionIndex(displayIdx);
+        const isAnswered = window.SAS_APP.examAnswers[masterIdx] !== undefined;
+        const isDoubt = window.SAS_APP.examDoubts[masterIdx];
+        const isCurrent = window.SAS_APP.currentQuestionIdx === displayIdx;
 
         let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
         if (isDoubt) badgeClass = 'bg-amber-500 text-white font-bold';
@@ -2277,8 +1872,8 @@
         if (isCurrent) badgeClass += ' ring-2 ring-slate-900 ring-offset-1';
 
         return `
-          <button onclick="jumpToQuestion(${idx})" class="w-9 h-9 rounded-lg text-xs flex items-center justify-center border transition ${badgeClass}">
-            ${idx + 1}
+          <button onclick="jumpToQuestion(${displayIdx})" class="w-9 h-9 rounded-lg text-xs flex items-center justify-center border transition ${badgeClass}">
+            ${displayIdx + 1}
           </button>
         `;
       }).join('');
@@ -2292,8 +1887,9 @@
       const answers = { ...window.SAS_APP.examAnswers };
       let correctCount = 0;
 
-      exam.questions.forEach((q, idx) => {
-        if (answers[idx] === q.answer) {
+      exam.questions.forEach((q, masterIdx) => {
+        const ans = answers[masterIdx] ?? answers[String(masterIdx)];
+        if (ans === q.answer) {
           correctCount++;
         }
       });
@@ -2320,7 +1916,9 @@
         await window.DB_SERVICE.submitExamResult(resultObj);
         window.clearSavedExamProgress(exam.id, window.SAS_APP.userProfile.id);
         window.SAS_APP.activeExam = null;
-        document.getElementById('exam-security-overlay').classList.add('hidden');
+        const overlay = document.getElementById('exam-security-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
         await window.exitExamFullscreen();
 
         const prefix = forcedReason
@@ -2422,7 +2020,6 @@
         const xmlDoc = parser.parseFromString(docXmlStr, 'application/xml');
         const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
-        // 1. Konversi Word Equation (m:oMath) menjadi teks matematika terbaca
         const oMaths = Array.from(xmlDoc.getElementsByTagNameNS('*', 'oMath'));
         oMaths.forEach(mathEl => {
           const textVal = convertOmmlToReadableText(mathEl).trim();
@@ -2435,7 +2032,6 @@
           }
         });
 
-        // 2. Ekstrak definisi Auto-Numbering Word (word/numbering.xml) agar nomor soal & opsi A-D tidak hilang
         const numFile = zip.file('word/numbering.xml');
         if (numFile) {
           const numXmlStr = await numFile.async('string');
@@ -2485,7 +2081,6 @@
               counters[key]++;
             }
 
-            // Reset sub-level saat level induk bertambah
             if (ilvl === '0') {
               Object.keys(counters).forEach(k => {
                 if (k.startsWith(`${numId}_`) && k !== key) delete counters[k];
@@ -2493,7 +2088,6 @@
             }
 
             const prefixText = formatNumberingIndex(counters[key], lvlInfo.numFmt);
-            // Hapus numPr agar Mammoth tidak menggandakan nomor, lalu sisipkan teks nomor eksplisit di awal paragraf
             numPr.parentNode.removeChild(numPr);
             const rEl = xmlDoc.createElementNS(W_NS, 'w:r');
             const tEl = xmlDoc.createElementNS(W_NS, 'w:t');
@@ -2562,7 +2156,6 @@
     }
 
     function splitInlineOptionsIfAny(text) {
-      // Mendukung opsi sejajar dalam 1 baris: "A. ... B. ... C. ... D. ..."
       const inlineRegex = /(?:^|\s)([A-Da-d])[\.\)]\s+/g;
       const matches = [...text.matchAll(inlineRegex)];
       if (matches.length >= 2 && matches[0].index <= 2) {
@@ -2581,7 +2174,6 @@
     function finalizeQuestionOptions(qObj) {
       if (!qObj) return;
       const hasExplicitOptions = ['A', 'B', 'C', 'D'].some(k => qObj.options[k] || (qObj.optionImages && qObj.optionImages[k]));
-      // Jika file Word menulis 4 opsi tanpa huruf A/B/C/D (misalnya bullet atau baris langsung sebelum Kunci:)
       if (!hasExplicitOptions && qObj._unlabeledLines && qObj._unlabeledLines.length >= 4) {
         const optLines = qObj._unlabeledLines.slice(-4);
         const extraQuestionLines = qObj._unlabeledLines.slice(0, -4);
@@ -2657,18 +2249,17 @@
         let line = normalizeDigits(block.text || '').trim();
         const imgs = block.imgs || [];
 
-        // Abaikan judul dokumen sebelum soal nomor 1
         if (!currentQ && line && !/^(?:soal\s*)?(\d+)[\.\)\:\-]/i.test(line)) {
           if (imgs.length > 0) pendingImagesBeforeNextQ.push(...imgs);
           return;
         }
 
-        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban|kj)[\s:\-\=]*([A-Da-dأابجد])/i);
+        const keyMatch = line.match(/^(?:kunci\s*jawaban|kunci|jawaban\s*benar|jawaban|kj)\s*[:\-\=\.\)]*\s*[\(\[\{\*\"\']*\s*([A-Da-dأابجد])\s*[\)\]\}\*\"\'\.]*\s*$/i);
+        const inlineTrailingKeyMatch = line.match(/(?:kunci\s*jawaban|kunci|jawaban\s*benar|jawaban|kj)\s*[:\-\=\.\)]*\s*[\(\[\{\*\"\']*\s*([A-Da-dأابجد])\s*[\)\]\}\*\"\'\.]*\s*$/i);
         const qMatch = line.match(/^(?:soal\s*)?(\d+)[\.\)\:\-]\s*(.*)/i);
         const optMatch = line.match(/^[\(\[]?([A-Da-dأابجد])[\.\)\]]\s*(.*)/);
         const bulletMatch = line.match(/^[•\-\*]\s*(.*)/);
 
-        // Tangani opsi yang diawali angka seperti "1)", "2)", "3)", "4)" setelah pertanyaan sudah terisi
         const isNumberedSubOption = currentQ &&
           qMatch &&
           currentQ.question.length > 0 &&
@@ -2679,6 +2270,7 @@
         if (keyMatch && currentQ) {
           const rawKey = keyMatch[1];
           currentQ.answer = arabicOptMap[rawKey] || rawKey.toUpperCase();
+          currentQ._hasExplicitKey = true;
           finalizeQuestionOptions(currentQ);
           parsedDocxQuestions.push(currentQ);
           currentQ = null;
@@ -2696,13 +2288,22 @@
             options: {},
             optionImages: {},
             answer: 'A',
+            _hasExplicitKey: false,
             _unlabeledLines: []
           };
           pendingImagesBeforeNextQ = [];
           lastTarget = 'question';
           lastOptionKey = null;
         } else if (optMatch && currentQ) {
-          const inlineParts = splitInlineOptionsIfAny(line);
+          let lineWithoutKey = line;
+          if (inlineTrailingKeyMatch && inlineTrailingKeyMatch.index > 3) {
+            const rawKey = inlineTrailingKeyMatch[1];
+            currentQ.answer = arabicOptMap[rawKey] || rawKey.toUpperCase();
+            currentQ._hasExplicitKey = true;
+            lineWithoutKey = line.slice(0, inlineTrailingKeyMatch.index).trim();
+          }
+
+          const inlineParts = splitInlineOptionsIfAny(lineWithoutKey);
           if (inlineParts) {
             inlineParts.forEach(p => {
               currentQ.options[p.key] = p.text;
@@ -2712,12 +2313,24 @@
           } else {
             const rawOpt = optMatch[1];
             const optKey = arabicOptMap[rawOpt] || rawOpt.toUpperCase();
-            currentQ.options[optKey] = optMatch[2].trim();
+            let optText = optMatch[2].trim();
+            if (inlineTrailingKeyMatch) {
+              optText = optText.replace(/(?:kunci\s*jawaban|kunci|jawaban\s*benar|jawaban|kj)\s*[:\-\=\.\)]*\s*[\(\[\{\*\"\']*\s*[A-Da-dأابجد]\s*[\)\]\}\*\"\'\.]*\s*$/i, '').trim();
+            }
+            currentQ.options[optKey] = optText;
             if (imgs[0]) {
               currentQ.optionImages[optKey] = imgs[0];
             }
             lastTarget = 'option';
             lastOptionKey = optKey;
+          }
+
+          if (currentQ._hasExplicitKey) {
+            finalizeQuestionOptions(currentQ);
+            parsedDocxQuestions.push(currentQ);
+            currentQ = null;
+            lastTarget = 'key';
+            lastOptionKey = null;
           }
         } else if (currentQ) {
           const cleanLine = bulletMatch ? bulletMatch[1].trim() : line;
@@ -2731,7 +2344,6 @@
               currentQ.optionImages[lastOptionKey] = imgs[0];
             }
           } else {
-            // Simpan baris/gambar setelah baris soal utama; akan dipetakan otomatis ke opsi A-D jika ada 4 baris sebelum Kunci:
             if (!currentQ.question && cleanLine) {
               currentQ.question = cleanLine;
               if (imgs[0] && !currentQ.image) currentQ.image = imgs[0];
@@ -2746,7 +2358,6 @@
             }
           }
         } else if (!currentQ && imgs.length > 0) {
-          // Gambar berada tepat setelah baris Kunci soal sebelumnya (milik soal berikutnya)
           pendingImagesBeforeNextQ.push(...imgs);
         }
       });
@@ -2755,6 +2366,32 @@
         finalizeQuestionOptions(currentQ);
         parsedDocxQuestions.push(currentQ);
       }
+
+      // Tangkap kunci jawaban apabila ditulis terpisah di bagian akhir dokumen (misal: "1. B  2. C  3. D" atau tabel kunci)
+      const trailingKeyMap = {};
+      blocks.forEach(block => {
+        const txt = normalizeDigits(block.text || '').trim();
+        const pairMatches = [...txt.matchAll(/(?:^|\s|;)(\d{1,3})\s*[\.\)\:\-\=]\s*[\(\[]?([A-Da-dأابجد])[\)\]\.]?(?=\s|$|,|;)/g)];
+        if (pairMatches.length >= 1 && txt.length < 180) {
+          pairMatches.forEach(m => {
+            const qNum = parseInt(m[1], 10);
+            const rawK = m[2];
+            trailingKeyMap[qNum] = arabicOptMap[rawK] || rawK.toUpperCase();
+          });
+        }
+      });
+
+      parsedDocxQuestions.forEach((q, idx) => {
+        if (!q._hasExplicitKey) {
+          const mappedKey = trailingKeyMap[q.id] || trailingKeyMap[idx + 1];
+          if (mappedKey) {
+            q.answer = mappedKey;
+            q._hasExplicitKey = true;
+          }
+        }
+        delete q._hasExplicitKey;
+      });
+
       renderParsedQuestionsPreview();
     }
 
@@ -2790,6 +2427,7 @@
       const duration = parseInt(document.getElementById('exam-input-duration').value);
       const startTime = document.getElementById('exam-input-start-time').value;
       const endTime = document.getElementById('exam-input-end-time').value;
+      const randomizeQuestions = !!document.getElementById('exam-input-randomize')?.checked;
 
       if (parsedDocxQuestions.length === 0) {
         showNotify('Soal Kosong', 'Harap unggah file .docx yang berisi soal terlebih dahulu!', true);
@@ -2813,6 +2451,7 @@
           duration,
           startTime: startTime || '',
           endTime: endTime || '',
+          randomizeQuestions,
           status: 'aktif',
           createdBy: window.SAS_APP.currentUser?.username || 'admin',
           createdAt: new Date().toISOString(),
@@ -2879,6 +2518,9 @@
         }
 
         window.SAS_APP.currentUser = loggedUser;
+        if (!window.SAS_APP.IS_PREVIEW && typeof window.syncStaffData === 'function') {
+          await window.syncStaffData();
+        }
         updateLoggedInUI();
         closeLoginModal();
         switchView('dashboard-view');
@@ -2907,6 +2549,12 @@
     };
 
     window.handleLogout = async function() {
+      clearInterval(window.SAS_APP.examTimer);
+      window.SAS_APP.activeExam = null;
+      window.SAS_APP.examAnswers = {};
+      window.SAS_APP.examDoubts = {};
+      window.SAS_APP.tabViolations = 0;
+
       await window.DB_SERVICE.logoutUser();
       window.SAS_APP.currentUser = null;
       document.getElementById('user-profile-badge').classList.add('hidden');
@@ -2919,11 +2567,15 @@
 
     window.openLoginModal = function() {
       document.getElementById('login-error-msg').classList.add('hidden');
-      document.getElementById('login-modal').classList.remove('hidden');
+      const modal = document.getElementById('login-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
     };
 
     window.closeLoginModal = function() {
-      document.getElementById('login-modal').classList.add('hidden');
+      const modal = document.getElementById('login-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     };
 
     window.renderDashboard = function() {
@@ -2956,6 +2608,7 @@
       } else {
         tbody.innerHTML = exams.map(ex => {
           const sched = getExamScheduleState(ex);
+          const safeTitle = escapeHtmlAttr(ex.title);
           let schedBadge = `<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Bebas / Terbuka</span>`;
           if (ex.startTime) {
             schedBadge = `
@@ -2968,7 +2621,10 @@
 
           return `
             <tr class="hover:bg-slate-50">
-              <td class="py-3 px-4 font-bold text-slate-900">${ex.title}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div>${ex.title}</div>
+                ${ex.randomizeQuestions ? '<span class="inline-block mt-0.5 text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">Soal Diacak</span>' : ''}
+              </td>
               <td class="py-3 px-4">${ex.subject}</td>
               <td class="py-3 px-4"><span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded">Kelas ${ex.targetClass}</span></td>
               <td class="py-3 px-4">${ex.duration} Mnt</td>
@@ -2979,13 +2635,147 @@
                   ${ex.status}
                 </button>
               </td>
-              <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+              <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                <button onclick="openEditQuestionsModal('${ex.id}')" class="text-blue-700 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200">Edit Soal</button>
                 <button onclick="openScheduleModal('${ex.id}')" class="text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200">Jadwal</button>
-                <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${ex.title} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+                <button onclick="openConfirmModal('Hapus Paket Ujian?', 'Paket ujian ${safeTitle} akan dihapus permanen.', () => handleDeleteExam('${ex.id}'))" class="text-rose-600 hover:text-rose-800 font-bold px-1.5 py-1">Hapus</button>
               </td>
             </tr>
           `;
         }).join('');
+      }
+    };
+
+    // ==================== EDIT SOAL & HITUNG ULANG NILAI ====================
+    window.openEditQuestionsModal = function(examId) {
+      const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!ex) return;
+
+      document.getElementById('edit-exam-id').value = ex.id;
+      document.getElementById('edit-questions-title').innerText = `Edit Soal: ${ex.title} (${ex.subject} - Kelas ${ex.targetClass})`;
+      document.getElementById('edit-exam-randomize').checked = !!ex.randomizeQuestions;
+
+      const listEl = document.getElementById('edit-questions-list');
+      listEl.innerHTML = ex.questions.map((q, idx) => {
+        const optInputs = ['A', 'B', 'C', 'D'].map(k => {
+          const val = escapeHtmlAttr(q.options?.[k] || '');
+          return `
+            <div class="flex items-center gap-1.5">
+              <span class="w-6 h-6 rounded bg-slate-200 text-slate-800 font-extrabold text-[11px] flex items-center justify-center shrink-0">${k}</span>
+              <input type="text" data-qidx="${idx}" data-opt="${k}" value="${val}" class="edit-q-opt w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs">
+            </div>
+          `;
+        }).join('');
+
+        const ansOptions = ['A', 'B', 'C', 'D'].map(k => {
+          const sel = q.answer === k ? 'selected' : '';
+          return `<option value="${k}" ${sel}>Kunci: ${k}</option>`;
+        }).join('');
+
+        return `
+          <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-extrabold text-slate-900">Soal Nomor ${idx + 1}</span>
+              <select data-qidx="${idx}" class="edit-q-ans bg-emerald-50 border border-emerald-300 text-emerald-900 font-extrabold text-xs rounded-lg px-2.5 py-1">
+                ${ansOptions}
+              </select>
+            </div>
+            <textarea data-qidx="${idx}" rows="2" class="edit-q-text w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-medium">${escapeHtmlAttr(q.question || '')}</textarea>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${optInputs}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const modal = document.getElementById('edit-questions-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      window.safeCreateIcons();
+    };
+
+    window.closeEditQuestionsModal = function() {
+      const modal = document.getElementById('edit-questions-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+
+    window.saveEditedQuestions = async function() {
+      const examId = document.getElementById('edit-exam-id').value;
+      const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!ex) return;
+
+      const randomizeQuestions = !!document.getElementById('edit-exam-randomize').checked;
+      const updatedQuestions = ex.questions.map((q, idx) => {
+        const textEl = document.querySelector(`.edit-q-text[data-qidx="${idx}"]`);
+        const ansEl = document.querySelector(`.edit-q-ans[data-qidx="${idx}"]`);
+        const newOptions = { ...(q.options || {}) };
+        ['A', 'B', 'C', 'D'].forEach(k => {
+          const optEl = document.querySelector(`.edit-q-opt[data-qidx="${idx}"][data-opt="${k}"]`);
+          if (optEl) newOptions[k] = optEl.value.trim();
+        });
+        return {
+          ...q,
+          question: textEl ? textEl.value.trim() : q.question,
+          options: newOptions,
+          answer: ansEl ? ansEl.value : q.answer
+        };
+      });
+
+      const btn = document.getElementById('btn-save-edited-questions');
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      try {
+        await window.DB_SERVICE.updateExamQuestions(examId, updatedQuestions, randomizeQuestions);
+        closeEditQuestionsModal();
+        renderDashboard();
+        showNotify('Soal Diperbarui', 'Perubahan teks soal, kunci jawaban, dan pengaturan acak soal berhasil disimpan.');
+      } catch (err) {
+        showNotify('Gagal Menyimpan Soal', err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Perubahan Soal';
+      }
+    };
+
+    window.recalculateExamScores = async function() {
+      const examId = document.getElementById('edit-exam-id').value;
+      const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+      if (!ex) return;
+
+      const latestAnswers = ex.questions.map((q, idx) => {
+        const ansEl = document.querySelector(`.edit-q-ans[data-qidx="${idx}"]`);
+        return ansEl ? ansEl.value : q.answer;
+      });
+
+      const affectedResults = findMatchingResultsForExam(ex);
+      if (affectedResults.length === 0) {
+        showNotify('Belum Ada Peserta', 'Belum ada siswa yang mengumpulkan ujian pada paket soal ini.');
+        return;
+      }
+
+      const btn = document.getElementById('btn-recalc-scores');
+      btn.disabled = true;
+      btn.innerText = 'Menghitung Ulang...';
+
+      try {
+        for (const res of affectedResults) {
+          let correctCount = 0;
+          latestAnswers.forEach((correctKey, qIdx) => {
+            const stuAns = res.studentAnswers ? (res.studentAnswers[qIdx] ?? res.studentAnswers[String(qIdx)]) : null;
+            if (stuAns === correctKey) correctCount++;
+          });
+          const newScore = Math.round((correctCount / latestAnswers.length) * 100);
+          await window.DB_SERVICE.updateResultScore(res.id, newScore, correctCount);
+        }
+        renderDashboard();
+        showNotify('Nilai Dihitung Ulang', `Skor untuk ${affectedResults.length} siswa berhasil diperbarui sesuai kunci jawaban terbaru.`);
+      } catch (err) {
+        showNotify('Gagal Menghitung Ulang', err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Hitung Ulang Nilai Siswa Terdampak';
       }
     };
 
@@ -2996,12 +2786,16 @@
       document.getElementById('schedule-modal-title').innerText = `Jadwal: ${ex.title}`;
       document.getElementById('schedule-input-start').value = ex.startTime || '';
       document.getElementById('schedule-input-end').value = ex.endTime || '';
-      document.getElementById('schedule-modal').classList.remove('hidden');
+      const modal = document.getElementById('schedule-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
       window.safeCreateIcons();
     };
 
     window.closeScheduleModal = function() {
-      document.getElementById('schedule-modal').classList.add('hidden');
+      const modal = document.getElementById('schedule-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     };
 
     window.clearScheduleInputs = function() {
@@ -3049,7 +2843,7 @@
       showNotify('Terhapus', 'Paket ujian berhasil dihapus.');
     };
 
-    window.renderRekapTable = function() {
+    function getFilteredRekapResults() {
       const user = window.SAS_APP.currentUser;
       const clsFilter = document.getElementById('rekap-filter-class').value;
       const subFilter = document.getElementById('rekap-filter-subject').value;
@@ -3063,10 +2857,65 @@
       }
 
       if (subFilter !== 'all') results = results.filter(r => r.subject === subFilter);
+      return results;
+    }
+
+    function renderStudentCompletionMonitor() {
+      const monitorEl = document.getElementById('student-completion-monitor');
+      if (!monitorEl) return;
+
+      const user = window.SAS_APP.currentUser;
+      const clsFilter = (user && user.role === 'guru' && user.class)
+        ? user.class
+        : document.getElementById('rekap-filter-class')?.value;
+      const subFilter = document.getElementById('rekap-filter-subject')?.value;
+
+      if (!clsFilter || clsFilter === 'all' || !subFilter || subFilter === 'all') {
+        monitorEl.classList.add('hidden');
+        monitorEl.innerHTML = '';
+        return;
+      }
+
+      const roster = window.SAS_APP.data.students.filter(s => s.class === clsFilter);
+      const completedResults = window.SAS_APP.data.results.filter(
+        r => r.studentClass === clsFilter && normalizeIdentityStr(r.subject) === normalizeIdentityStr(subFilter)
+      );
+
+      const pendingStudents = roster.filter(stu => {
+        const normName = normalizeIdentityStr(stu.name);
+        return !completedResults.some(r =>
+          (stu.id && r.studentId === stu.id) || normalizeIdentityStr(r.studentName) === normName
+        );
+      });
+
+      const doneCount = roster.length - pendingStudents.length;
+      const pendingHtml = pendingStudents.length === 0
+        ? '<p class="text-xs font-bold text-emerald-700 mt-2">Seluruh siswa di kelas ini sudah mengumpulkan ujian.</p>'
+        : `<div class="mt-2.5 pt-2.5 border-t border-slate-200"><p class="text-[11px] font-bold text-rose-700 mb-1.5">Daftar Siswa Belum Mengumpulkan (${pendingStudents.length} siswa):</p><div class="flex flex-wrap gap-1.5">${pendingStudents.map(s => `<span class="bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">${s.name}</span>`).join('')}</div></div>`;
+
+      monitorEl.classList.remove('hidden');
+      monitorEl.innerHTML = `
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span class="font-extrabold text-slate-900">Pemantau Kehadiran Ujian — Kelas ${clsFilter} (${subFilter})</span>
+            <div class="flex items-center gap-2">
+              <span class="bg-slate-100 text-slate-800 font-bold px-2.5 py-1 rounded-lg">Rombel: ${roster.length}</span>
+              <span class="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">Sudah Ujian: ${doneCount}</span>
+              <span class="bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded-lg">Belum Selesai: ${pendingStudents.length}</span>
+            </div>
+          </div>
+          ${pendingHtml}
+        </div>
+      `;
+    }
+
+    window.renderRekapTable = function() {
+      renderStudentCompletionMonitor();
+      const results = getFilteredRekapResults();
 
       const tbody = document.getElementById('rekap-tbody');
       if (results.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada data hasil ujian untuk filter terpilih.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Belum ada data hasil ujian untuk filter terpilih.</td></tr>`;
       } else {
         tbody.innerHTML = results.map((r, i) => `
           <tr class="hover:bg-slate-50">
@@ -3077,9 +2926,55 @@
             <td class="py-3 px-4 font-semibold text-emerald-700">${r.correctCount} / ${r.totalQuestions}</td>
             <td class="py-3 px-4"><span class="bg-amber-100 text-amber-900 font-extrabold px-2.5 py-1 rounded-lg">${r.score}</span></td>
             <td class="py-3 px-4 text-slate-500">${r.completedAt}</td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="openConfirmModal('Reset Nilai Siswa?', 'Nilai ujian ${r.subject} milik ${r.studentName.replace(/'/g, "\\'")} akan dihapus sehingga siswa dapat mengulang ujian/simulasi.', () => handleDeleteSingleResult('${r.id}'))" class="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold px-2.5 py-1 rounded-lg text-[11px] transition">
+                Reset
+              </button>
+            </td>
           </tr>
         `).join('');
       }
+    };
+
+    window.handleDeleteSingleResult = async function(resultId) {
+      try {
+        await window.DB_SERVICE.deleteResult(resultId);
+        renderRekapTable();
+        showNotify('Nilai Direset', 'Data hasil ujian siswa berhasil dihapus. Siswa kini dapat mengerjakan ulang.');
+      } catch (err) {
+        showNotify('Gagal Mereset Nilai', err.message, true);
+      }
+    };
+
+    window.confirmBulkResetResults = function() {
+      const results = getFilteredRekapResults();
+      if (results.length === 0) {
+        showNotify('Data Kosong', 'Tidak ada data nilai pada filter saat ini untuk direset.', true);
+        return;
+      }
+
+      const user = window.SAS_APP.currentUser;
+      const clsFilter = document.getElementById('rekap-filter-class').value;
+      const subFilter = document.getElementById('rekap-filter-subject').value;
+      const labelKelas = (user && user.role === 'guru' && user.class)
+        ? `Kelas ${user.class}`
+        : (clsFilter === 'all' ? 'Semua Kelas' : `Kelas ${clsFilter}`);
+      const labelMapel = subFilter === 'all' ? 'Semua Mata Pelajaran' : subFilter;
+
+      openConfirmModal(
+        'Reset Semua Hasil Simulasi Terfilter?',
+        `Sebanyak ${results.length} data hasil ujian (${labelKelas} — ${labelMapel}) akan dihapus permanen dari database.\n\nSiswa yang datanya dihapus dapat mengerjakan ulang ujian dari awal.`,
+        async () => {
+          try {
+            const ids = results.map(r => r.id);
+            await window.DB_SERVICE.deleteMultipleResults(ids);
+            renderRekapTable();
+            showNotify('Hasil Simulasi Direset', `Sebanyak ${ids.length} data hasil ujian berhasil dibersihkan.`);
+          } catch (err) {
+            showNotify('Gagal Mereset Hasil', err.message, true);
+          }
+        }
+      );
     };
 
     window.exportResultsToExcel = function() {
@@ -3194,10 +3089,21 @@
       URL.revokeObjectURL(url);
     };
 
-    window.openAnalysisModal = function() {
+    window.openAnalysisModal = async function() {
       const modal = document.getElementById('analysis-modal');
       const selectExam = document.getElementById('analysis-select-exam');
+      const container = document.getElementById('analysis-matrix-container');
       const user = window.SAS_APP.currentUser;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      container.innerHTML = '<div class="text-center py-10 text-xs text-slate-500 font-semibold">Menyinkronkan data hasil ujian terbaru dari server...</div>';
+      window.safeCreateIcons();
+
+      if (!window.SAS_APP.IS_PREVIEW && typeof window.syncStaffData === 'function') {
+        await window.syncStaffData();
+      }
+
       let exams = window.SAS_APP.data.exams;
 
       if (user && user.role === 'guru' && user.class) {
@@ -3205,6 +3111,7 @@
       }
 
       if (exams.length === 0) {
+        closeAnalysisModal();
         showNotify('Paket Ujian Kosong', 'Belum ada paket ujian tersedia untuk dianalisis.', true);
         return;
       }
@@ -3213,14 +3120,37 @@
         <option value="${e.id}">${e.title} (${e.subject} - Kelas ${e.targetClass})</option>
       `).join('');
 
-      modal.classList.remove('hidden');
       renderAnalysisMatrix();
       window.safeCreateIcons();
     };
 
     window.closeAnalysisModal = function() {
-      document.getElementById('analysis-modal').classList.add('hidden');
+      const modal = document.getElementById('analysis-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     };
+
+    function findMatchingResultsForExam(exam) {
+      const allResults = window.SAS_APP.data.results || [];
+      const exactMatches = allResults.filter(r => r.examId === exam.id);
+      if (exactMatches.length > 0) return exactMatches;
+
+      const normSub = normalizeIdentityStr(exam.subject);
+      const normCls = normalizeIdentityStr(exam.targetClass);
+      return allResults.filter(r =>
+        normalizeIdentityStr(r.subject) === normSub &&
+        normalizeIdentityStr(r.studentClass) === normCls
+      );
+    }
+
+    function findStudentResultInList(student, examResults) {
+      if (!examResults || examResults.length === 0) return null;
+      const normName = normalizeIdentityStr(student.name);
+      return examResults.find(r =>
+        (student.id && r.studentId === student.id) ||
+        normalizeIdentityStr(r.studentName) === normName
+      ) || null;
+    }
 
     window.printAnalysisMatrix = function() {
       const examId = document.getElementById('analysis-select-exam').value;
@@ -3245,14 +3175,6 @@
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
-            .print-header {
-              text-align: center;
-              margin-bottom: 12px;
-              border-bottom: 2px solid #0F172A;
-              padding-bottom: 8px;
-            }
-            .print-header h2 { margin: 0; font-size: 14pt; text-transform: uppercase; }
-            .print-header p { margin: 3px 0; font-size: 10pt; }
             table {
               width: 100%;
               border-collapse: collapse;
@@ -3318,35 +3240,36 @@
         </head>
         <body>
           ${matrixContent}
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.focus();
-                window.print();
-              }, 300);
-            };
-          <\/script>
         </body>
         </html>
       `;
 
-      const printWindow = window.open('', '_blank', 'width=1100,height=750');
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(printDocHTML);
-        printWindow.document.close();
-      } else {
-        const blob = new Blob([printDocHTML], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Cetak_Analisis_SAS_${exam.subject}_Kelas_${exam.targetClass}.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showNotify('File Siap Cetak Diunduh', 'Pop-up cetak diblokir oleh browser. File lembar cetak telah diunduh otomatis—silakan buka file tersebut lalu tekan Ctrl+P untuk Cetak / Save as PDF.');
-      }
+      let printFrame = document.getElementById('sas-hidden-print-frame');
+      if (printFrame) printFrame.remove();
+
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'sas-hidden-print-frame';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(printDocHTML);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+        } catch (err) {
+          window.print();
+        }
+      }, 300);
     };
 
     window.exportAnalysisToExcel = function() {
@@ -3357,7 +3280,7 @@
       const teacherObj = window.SAS_APP.data.teachers.find(t => t.class === exam.targetClass);
       const teacherName = teacherObj ? teacherObj.name : '.......................................';
       const targetStudents = window.SAS_APP.data.students.filter(s => s.class === exam.targetClass);
-      const examResults = window.SAS_APP.data.results.filter(r => r.examId === exam.id);
+      const examResults = findMatchingResultsForExam(exam);
       const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
       const totalCols = exam.questions.length + 3;
 
@@ -3395,12 +3318,13 @@
       `;
 
       targetStudents.forEach((student, idx) => {
-        const res = examResults.find(r => r.studentName === student.name);
+        const res = findStudentResultInList(student, examResults);
         excelHTML += `<tr><td>${idx + 1}</td><td class="left">${student.name}</td>`;
         if (res) {
           excelHTML += `<td class="skor">${res.score}</td>`;
           exam.questions.forEach((q, qIdx) => {
-            const ans = (res.studentAnswers && res.studentAnswers[qIdx]) ? res.studentAnswers[qIdx] : '-';
+            const rawAns = res.studentAnswers ? (res.studentAnswers[qIdx] ?? res.studentAnswers[String(qIdx)]) : null;
+            const ans = rawAns || '-';
             const cls = ans === '-' ? 'kosong' : (ans === q.answer ? 'benar' : 'salah');
             excelHTML += `<td class="${cls}">${ans}</td>`;
           });
@@ -3450,10 +3374,21 @@
       const teacherName = teacherObj ? teacherObj.name : '.......................................';
 
       const targetStudents = window.SAS_APP.data.students.filter(s => s.class === exam.targetClass);
-      const examResults = window.SAS_APP.data.results.filter(r => r.examId === exam.id);
+      const examResults = findMatchingResultsForExam(exam);
+
+      const displayList = [...targetStudents];
+      examResults.forEach(r => {
+        const existsInRoster = displayList.some(s =>
+          (r.studentId && s.id === r.studentId) ||
+          normalizeIdentityStr(s.name) === normalizeIdentityStr(r.studentName)
+        );
+        if (!existsInRoster && r.studentName) {
+          displayList.push({ id: r.studentId || '', name: r.studentName, class: exam.targetClass });
+        }
+      });
 
       summaryBadge.innerHTML = `
-        <span>Total Siswa Rombel: <b>${targetStudents.length}</b></span> |
+        <span>Total Siswa Rombel: <b>${displayList.length}</b></span> |
         <span>Sudah Ujian: <b class="text-emerald-600">${examResults.length}</b></span>
       `;
 
@@ -3482,11 +3417,11 @@
           <tbody class="divide-y divide-slate-200 text-[11px]">
       `;
 
-      if (targetStudents.length === 0) {
+      if (displayList.length === 0) {
         tableHTML += `<tr><td colspan="${exam.questions.length + 3}" class="text-center p-4 text-slate-400">Belum ada data siswa terdaftar pada kelas ini.</td></tr>`;
       } else {
-        targetStudents.forEach((student, idx) => {
-          const studentResult = examResults.find(r => r.studentName === student.name);
+        displayList.forEach((student, idx) => {
+          const studentResult = findStudentResultInList(student, examResults);
 
           tableHTML += `
             <tr class="hover:bg-slate-50 font-medium">
@@ -3502,7 +3437,9 @@
             `;
 
             exam.questions.forEach((q, qIdx) => {
-              const savedAns = studentResult.studentAnswers ? studentResult.studentAnswers[qIdx] : null;
+              const savedAns = studentResult.studentAnswers
+                ? (studentResult.studentAnswers[qIdx] ?? studentResult.studentAnswers[String(qIdx)])
+                : null;
               const ans = savedAns || '-';
               const isCorrect = ans === q.answer;
 
@@ -3561,7 +3498,7 @@
             <td class="py-2.5 px-3">${t.name}</td>
             <td class="py-2.5 px-3 font-mono text-slate-500">${t.username}</td>
             <td class="py-2.5 px-3 text-right">
-              <button onclick="openConfirmModal('Hapus Akun Guru?', 'Akun ${t.name} akan dihapus.', () => handleDeleteTeacher('${t.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+              <button onclick="openConfirmModal('Hapus Akun Guru?', 'Akun ${t.name.replace(/'/g, "\\'")} akan dihapus.', () => handleDeleteTeacher('${t.id}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
             </td>
           </tr>
         `).join('');
@@ -3580,7 +3517,7 @@
             <td class="py-2 px-3 font-bold text-slate-800">Kelas ${s.class}</td>
             <td class="py-2 px-3 font-medium text-slate-900">${s.name}</td>
             <td class="py-2 px-3 text-right">
-              <button onclick="openConfirmModal('Hapus Siswa?', 'Hapus ${s.name} dari daftar roster?', () => handleDeleteStudent('${s.id}', '${s.class}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
+              <button onclick="openConfirmModal('Hapus Siswa?', 'Hapus ${s.name.replace(/'/g, "\\'")} dari daftar roster?', () => handleDeleteStudent('${s.id}', '${s.class}'))" class="text-rose-600 hover:text-rose-800 font-bold">Hapus</button>
             </td>
           </tr>
         `).join('');
@@ -3654,6 +3591,402 @@
         e.preventDefault();
         e.returnValue = '';
       }
+    });
+  </script>
+
+  <!-- ==================== CORE APPLICATION & FIREBASE MODULE ==================== -->
+  <script type="module">
+    const IS_PREVIEW = false; 
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDao-dTHDohi4JKyaAtM-gPBaYwv3rM_T8",
+      authDomain: "asas011.firebaseapp.com",
+      projectId: "asas011",
+      storageBucket: "asas011.firebasestorage.app",
+      messagingSenderId: "625005082543",
+      appId: "1:625005082543:web:5b44953d682487c9e9e15a"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      signInAnonymously,
+      signInWithCustomToken,
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      doc, 
+      getDoc, 
+      setDoc, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      collection, 
+      getDocs 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'sas-sdn011-v3';
+        self.addEventListener('install', (e) => self.skipWaiting());
+        self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+        self.addEventListener('fetch', (e) => {
+          e.respondWith(fetch(e.request).catch(() => new Response('Offline Mode')));
+        });
+      `;
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl).catch(() => {});
+    }
+
+    window.SAS_APP = {
+      IS_PREVIEW,
+      app: null,
+      db: null,
+      auth: null,
+      appId: typeof __app_id !== 'undefined' ? __app_id : 'sdn011-sangatta-selatan',
+      currentUser: null,
+      userProfile: null,
+      activeExam: null,
+      examAnswers: {},
+      examDoubts: {},
+      questionOrder: null,
+      examTimer: null,
+      timeLeft: 0,
+      currentQuestionIdx: 0,
+      tabViolations: 0,
+      maxTabViolations: 3,
+
+      classes: ['3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B'],
+      subjects: [
+        'Bahasa Indonesia', 'Matematika', 'IPAS', 'PJOK', 
+        'Pendidikan Pancasila', 'Bahasa Inggris', 'Pendidikan Agama', 'Seni Budaya',
+        'Koding', 'Bahasa Kutai'
+      ],
+
+      data: {
+        teachers: [],
+        students: [],
+        exams: [],
+        results: []
+      }
+    };
+
+    function getPublicCollectionRef(colName) {
+      return collection(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName);
+    }
+
+    function getPublicDocRef(colName, docId) {
+      return doc(window.SAS_APP.db, 'artifacts', window.SAS_APP.appId, 'public', 'data', colName, docId);
+    }
+
+    async function ensureAuthenticatedSession() {
+      if (IS_PREVIEW || !window.SAS_APP.auth) return;
+      if (!window.SAS_APP.auth.currentUser) {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(window.SAS_APP.auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(window.SAS_APP.auth);
+        }
+      }
+    }
+
+    async function initProductionFirebase() {
+      if (IS_PREVIEW) return;
+
+      const activeConfig = (typeof __firebase_config !== 'undefined') 
+        ? JSON.parse(__firebase_config) 
+        : firebaseConfig;
+
+      window.SAS_APP.app = initializeApp(activeConfig);
+      window.SAS_APP.db = getFirestore(window.SAS_APP.app);
+      window.SAS_APP.auth = getAuth(window.SAS_APP.app);
+
+      try {
+        await ensureAuthenticatedSession();
+      } catch (err) {
+        console.error("Gagal login anonim Firebase:", err);
+      }
+
+      onAuthStateChanged(window.SAS_APP.auth, async (user) => {
+        if (user) {
+          if (!user.isAnonymous && user.email) {
+            window.SAS_APP.currentUser = {
+              id: user.uid,
+              username: user.email,
+              name: 'Panitia SAS (Admin)',
+              role: 'admin'
+            };
+            if (typeof window.updateLoggedInUI === 'function') window.updateLoggedInUI();
+          }
+          await window.syncInitialPublicData();
+        }
+      });
+    }
+
+    window.fetchClassRosterFromFirestore = async function(className) {
+      if (IS_PREVIEW || !window.SAS_APP.db || !className) return;
+      try {
+        await ensureAuthenticatedSession();
+        const docSnap = await getDoc(getPublicDocRef('rosters', className));
+        if (docSnap.exists() && Array.isArray(docSnap.data().list)) {
+          const classStudents = docSnap.data().list.map(stu => ({
+            id: stu.id,
+            name: stu.name,
+            class: className
+          }));
+          window.SAS_APP.data.students = [
+            ...window.SAS_APP.data.students.filter(s => s.class !== className),
+            ...classStudents
+          ];
+        } else {
+          window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.class !== className);
+        }
+      } catch (err) {
+        console.error(`Gagal mengambil roster kelas ${className}:`, err);
+      }
+    };
+
+    window.syncInitialPublicData = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db) return;
+      try {
+        await ensureAuthenticatedSession();
+        const [rostersSnap, examsSnap] = await Promise.all([
+          getDocs(getPublicCollectionRef('rosters')),
+          getDocs(getPublicCollectionRef('exams'))
+        ]);
+
+        let allStudents = [];
+        rostersSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          if (Array.isArray(d.list)) {
+            d.list.forEach(stu => {
+              allStudents.push({ id: stu.id, name: stu.name, class: docSnap.id });
+            });
+          }
+        });
+        window.SAS_APP.data.students = allStudents;
+        window.SAS_APP.data.exams = examsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (window.SAS_APP.currentUser) {
+          await window.syncStaffData();
+        }
+        refreshCurrentActiveView();
+      } catch (err) {
+        console.error("Gagal sinkronisasi awal:", err);
+      }
+    };
+
+    window.syncStaffData = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
+      try {
+        await ensureAuthenticatedSession();
+        const tasks = [getDocs(getPublicCollectionRef('results'))];
+        if (window.SAS_APP.currentUser.role === 'admin') {
+          tasks.push(getDocs(getPublicCollectionRef('teachers')));
+        }
+        const [resultsSnap, teachersSnap] = await Promise.all(tasks);
+        window.SAS_APP.data.results = resultsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (teachersSnap) {
+          window.SAS_APP.data.teachers = teachersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+      } catch (err) {
+        console.error("Gagal memuat data staf:", err);
+      }
+    };
+
+    function refreshCurrentActiveView() {
+      if (typeof window.populateClassDropdowns === 'function') {
+        window.populateClassDropdowns();
+      }
+      const activeSection = document.querySelector('.view-section:not(.hidden)');
+      if (!activeSection) return;
+      const id = activeSection.id;
+      if (id === 'home-view' && document.getElementById('student-select-class')?.value) {
+        if (typeof window.onStudentClassChange === 'function') window.onStudentClassChange();
+      }
+      if (id === 'dashboard-view' && typeof window.renderDashboard === 'function') window.renderDashboard();
+      if (id === 'rekap-view' && typeof window.renderRekapTable === 'function') window.renderRekapTable();
+      if (id === 'users-view' && typeof window.renderUsersManagement === 'function') window.renderUsersManagement();
+    }
+
+    window.DB_SERVICE = {
+      async loginAdmin(email, password) {
+        const userCred = await signInWithEmailAndPassword(window.SAS_APP.auth, email, password);
+        return {
+          id: userCred.user.uid,
+          username: userCred.user.email,
+          name: 'Panitia SAS (Admin)',
+          role: 'admin'
+        };
+      },
+
+      async loginTeacher(username, password) {
+        await ensureAuthenticatedSession();
+        const snap = await getDocs(getPublicCollectionRef('teachers'));
+        const teachersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const found = teachersList.find(
+          t => t.username && t.username.toLowerCase() === username.toLowerCase() && t.password === password
+        );
+        if (!found) throw new Error('Username atau Password Guru tidak terdaftar di database.');
+        return { ...found, role: 'guru' };
+      },
+
+      async logoutUser() {
+        if (!IS_PREVIEW && window.SAS_APP.auth) {
+          await signOut(window.SAS_APP.auth);
+          await signInAnonymously(window.SAS_APP.auth);
+        }
+      },
+
+      async addExam(examPayload) {
+        await ensureAuthenticatedSession();
+        const docRef = await addDoc(getPublicCollectionRef('exams'), examPayload);
+        const created = { id: docRef.id, ...examPayload };
+        window.SAS_APP.data.exams.push(created);
+        return created;
+      },
+
+      async toggleExamStatus(examId, newStatus) {
+        await ensureAuthenticatedSession();
+        await updateDoc(getPublicDocRef('exams', examId), { status: newStatus });
+        const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+        if (ex) ex.status = newStatus;
+      },
+
+      async updateExamSchedule(examId, startTime, endTime) {
+        await ensureAuthenticatedSession();
+        await updateDoc(getPublicDocRef('exams', examId), {
+          startTime: startTime || '',
+          endTime: endTime || ''
+        });
+        const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+        if (ex) {
+          ex.startTime = startTime || '';
+          ex.endTime = endTime || '';
+        }
+      },
+
+      async updateExamQuestions(examId, updatedQuestions, randomizeQuestions) {
+        await ensureAuthenticatedSession();
+        await updateDoc(getPublicDocRef('exams', examId), {
+          questions: updatedQuestions,
+          randomizeQuestions: !!randomizeQuestions
+        });
+        const ex = window.SAS_APP.data.exams.find(e => e.id === examId);
+        if (ex) {
+          ex.questions = updatedQuestions;
+          ex.randomizeQuestions = !!randomizeQuestions;
+        }
+      },
+
+      async deleteExam(examId) {
+        await ensureAuthenticatedSession();
+        await deleteDoc(getPublicDocRef('exams', examId));
+        window.SAS_APP.data.exams = window.SAS_APP.data.exams.filter(e => e.id !== examId);
+      },
+
+      async submitExamResult(resultPayload) {
+        await ensureAuthenticatedSession();
+        const uniqueResId = `${resultPayload.examId}_${resultPayload.studentId}`;
+        await setDoc(getPublicDocRef('results', uniqueResId), resultPayload);
+        const saved = { id: uniqueResId, ...resultPayload };
+        window.SAS_APP.data.results = [
+          ...window.SAS_APP.data.results.filter(r => r.id !== uniqueResId),
+          saved
+        ];
+        return saved;
+      },
+
+      async updateResultScore(resultId, score, correctCount) {
+        await ensureAuthenticatedSession();
+        await updateDoc(getPublicDocRef('results', resultId), { score, correctCount });
+        const target = window.SAS_APP.data.results.find(r => r.id === resultId);
+        if (target) {
+          target.score = score;
+          target.correctCount = correctCount;
+        }
+      },
+
+      async deleteResult(resultId) {
+        await ensureAuthenticatedSession();
+        await deleteDoc(getPublicDocRef('results', resultId));
+        window.SAS_APP.data.results = window.SAS_APP.data.results.filter(r => r.id !== resultId);
+      },
+
+      async deleteMultipleResults(resultIds) {
+        await ensureAuthenticatedSession();
+        await Promise.all(resultIds.map(id => deleteDoc(getPublicDocRef('results', id))));
+        const idSet = new Set(resultIds);
+        window.SAS_APP.data.results = window.SAS_APP.data.results.filter(r => !idSet.has(r.id));
+      },
+
+      async checkStudentAlreadySubmitted(examId, studentId) {
+        await ensureAuthenticatedSession();
+        const snap = await getDoc(getPublicDocRef('results', `${examId}_${studentId}`));
+        return snap.exists();
+      },
+
+      async saveClassRoster(className, studentNamesArray) {
+        const cleanList = studentNamesArray
+          .map((name, idx) => ({
+            id: `stu_${className}_${Date.now()}_${idx}`,
+            name: name.trim()
+          }))
+          .filter(item => item.name.length > 0);
+
+        await window.fetchClassRosterFromFirestore(className);
+        const existing = window.SAS_APP.data.students
+          .filter(s => s.class === className)
+          .map(s => ({ id: s.id, name: s.name }));
+        const merged = [...existing, ...cleanList];
+        
+        await setDoc(getPublicDocRef('rosters', className), {
+          class: className,
+          list: merged,
+          updatedAt: new Date().toISOString()
+        });
+        
+        window.SAS_APP.data.students = [
+          ...window.SAS_APP.data.students.filter(s => s.class !== className),
+          ...merged.map(m => ({ id: m.id, name: m.name, class: className }))
+        ];
+      },
+
+      async deleteStudent(studentId, className) {
+        const remaining = window.SAS_APP.data.students
+          .filter(s => s.class === className && s.id !== studentId)
+          .map(s => ({ id: s.id, name: s.name }));
+        await setDoc(getPublicDocRef('rosters', className), {
+          class: className,
+          list: remaining,
+          updatedAt: new Date().toISOString()
+        });
+        window.SAS_APP.data.students = window.SAS_APP.data.students.filter(s => s.id !== studentId);
+      },
+
+      async addTeacher(teacherPayload) {
+        const docRef = await addDoc(getPublicCollectionRef('teachers'), { ...teacherPayload, role: 'guru' });
+        const created = { id: docRef.id, ...teacherPayload, role: 'guru' };
+        window.SAS_APP.data.teachers.push(created);
+        return created;
+      },
+
+      async deleteTeacher(teacherId) {
+        await deleteDoc(getPublicDocRef('teachers', teacherId));
+        window.SAS_APP.data.teachers = window.SAS_APP.data.teachers.filter(t => t.id !== teacherId);
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (typeof window.safeCreateIcons === 'function') window.safeCreateIcons();
+      await initProductionFirebase();
+      if (typeof window.populateClassDropdowns === 'function') window.populateClassDropdowns();
+      if (typeof window.updateNavigationVisibility === 'function') window.updateNavigationVisibility();
+      if (typeof window.switchView === 'function') window.switchView('home-view');
     });
   </script>
 </body>

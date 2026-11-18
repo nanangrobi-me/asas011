@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Asesmen Sumatif Akhir Semester - SDN 011 Sangatta Selatan</title>
   
-  <!-- Favicon & PWA Icon Inline SVG (Selalu Terbaca di GitHub & Netlify) -->
+  <!-- Favicon & PWA Icon Inline SVG -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230F172A'/%3E%3Cpath d='M32 14L8 25l24 11 20-9.2V41h4V25L32 14zm-14 19.5v8.2c0 4.6 6.3 8.3 14 8.3s14-3.7 14-8.3v-8.2L32 40l-14-6.5z' fill='%23F59E0B'/%3E%3C/svg%3E" />
 
-  <!-- PWA Manifest Inline (Data URI) -->
+  <!-- PWA Manifest Inline -->
   <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkFzZXNtZW4gU0FTIFNETiAwMTEgU2FuZ2F0dGEgU2VsYXRhbiIsCiAgInNob3J0X25hbWUiOiAiU0FTIDAxMSBTQU5TRUwiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBmMTcyYSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjE3MmEiCn0=" />
 
   <!-- Tailwind CSS CDN -->
@@ -17,11 +17,11 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Mammoth.js & JSZip CDN untuk Import Word (.docx) lengkap (Gambar, Tabel, Numbering, Matematika, Arab) -->
+  <!-- Mammoth.js & JSZip CDN untuk Import Word (.docx) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <!-- Google Fonts: Plus Jakarta Sans & Noto Naskh Arabic / Amiri (Dukungan Tulisan Arab) -->
+  <!-- Google Fonts: Plus Jakarta Sans & Noto Naskh Arabic / Amiri -->
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <script>
@@ -146,7 +146,6 @@
       animation: heroZoomIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.38s forwards;
     }
 
-    /* Menyembunyikan badge Powered by Netlify */
     a[href*="netlify.com"] {
       display: none !important;
       visibility: hidden !important;
@@ -240,7 +239,7 @@
       <div class="max-w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         
         <!-- Logo & Title -->
-        <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" onclick="switchView('home-view')">
+        <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" onclick="safeNavigateHome()">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-brand-gold to-amber-300 flex items-center justify-center shadow text-brand-navy font-bold shrink-0 border border-amber-200">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" aria-hidden="true">
               <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/>
@@ -256,6 +255,12 @@
 
         <!-- User Info & Action Buttons -->
         <div class="flex items-center space-x-2 shrink-0">
+          <!-- Indikator Status Koneksi -->
+          <div id="connection-status-pill" class="hidden sm:flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700 text-[10px] font-bold text-emerald-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="connection-status-text">Online</span>
+          </div>
+
           <div id="user-profile-badge" class="hidden sm:flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
             <i data-lucide="user-check" class="w-3.5 h-3.5 text-amber-400"></i>
             <span id="badge-user-name" class="font-semibold text-slate-200 max-w-[140px] truncate">Guest</span>
@@ -282,7 +287,7 @@
 
     <!-- LAYOUT UTAMA: FIXED SIDEBAR (DESKTOP) + MAIN WORKSPACE -->
     <div class="flex flex-1">
-      <!-- DESKTOP FIXED SIDEBAR (HANYA TAMPIL SAAT ADMIN / GURU LOGIN) -->
+      <!-- DESKTOP FIXED SIDEBAR -->
       <aside id="desktop-sidebar" class="hidden w-64 bg-brand-navy text-slate-300 border-r border-slate-800 shrink-0 sticky top-[61px] h-[calc(100vh-61px)] p-4 flex-col justify-between">
         <div class="space-y-1.5">
           <p class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Menu Manajemen</p>
@@ -325,9 +330,8 @@
       <!-- MAIN CONTENT CONTAINER -->
       <main class="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6">
 
-        <!-- 1. LANDING VIEW / PORTAL SISWA (MOBILE-FIRST) -->
+        <!-- 1. LANDING VIEW / PORTAL SISWA -->
         <section id="home-view" class="view-section space-y-4 sm:space-y-6">
-          <!-- Hero Banner Clean & Ringkas di HP -->
           <div class="relative bg-gradient-to-br from-slate-900 via-brand-navy to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-lg overflow-hidden border border-slate-700">
             <div class="hidden sm:block absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
               <i data-lucide="file-text" class="w-64 h-64 sm:w-80 sm:h-80"></i>
@@ -345,7 +349,6 @@
             </div>
           </div>
 
-          <!-- Form Pilihan Akses Siswa & Daftar Ujian -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <!-- Input Pemilihan Identitas -->
             <div class="lg:col-span-1 glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
@@ -404,16 +407,14 @@
           </div>
         </section>
 
-        <!-- 2. MODE UJIAN SISWA (TOUCH OPTIMIZED & CLEAN MOBILE LAYOUT) -->
+        <!-- 2. MODE UJIAN SISWA -->
         <section id="exam-mode-view" class="view-section hidden space-y-3.5 sm:space-y-4">
-          <!-- Sticky Header Bar Ujian -->
           <div class="bg-brand-navy text-white p-3 sm:p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-slate-700 sticky top-[57px] sm:top-[65px] z-30">
             <div class="w-full sm:w-auto text-left flex items-center justify-between sm:block">
               <div class="min-w-0 pr-2">
                 <h2 id="exam-mode-title" class="text-xs sm:text-lg font-extrabold text-amber-400 truncate">Matematika - Kelas 3A</h2>
                 <p id="exam-mode-student" class="text-[11px] sm:text-xs text-slate-300 truncate">Peserta: Siswa</p>
               </div>
-              <!-- Timer Ringkas di Pojok Kanan Atas saat di HP -->
               <div class="sm:hidden flex items-center gap-1.5 bg-slate-900/95 px-2.5 py-1.5 rounded-xl border border-amber-500/40 shrink-0">
                 <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400 animate-pulse"></i>
                 <span id="exam-timer-display-mobile" class="font-mono text-xs font-extrabold text-white">00:00:00</span>
@@ -421,7 +422,6 @@
             </div>
             
             <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2 pt-1.5 sm:pt-0 border-t border-slate-800 sm:border-none">
-              <!-- Timer Desktop -->
               <div class="hidden sm:flex items-center gap-2 bg-slate-900/90 px-3 py-2 rounded-xl border border-amber-500/30">
                 <i data-lucide="clock" class="w-4 h-4 text-amber-400 animate-pulse"></i>
                 <div>
@@ -430,56 +430,55 @@
                 </div>
               </div>
 
-              <!-- Quick Toggle Sheet Nomor Soal (Mobile Only) -->
               <button onclick="toggleMobileQuestionGrid()" class="lg:hidden flex-1 sm:flex-none justify-center bg-slate-800 active:bg-slate-700 text-amber-400 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
                 <i data-lucide="grid" class="w-4 h-4"></i>
                 <span>Daftar Soal</span>
               </button>
 
-              <button onclick="openConfirmModal('Kumpulkan Ujian?', 'Pastikan seluruh soal sudah diperiksa. Lembar jawaban yang sudah dikumpulkan tidak dapat diubah kembali.', () => submitExam())" class="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-extrabold px-4 py-2 sm:py-2.5 rounded-xl shadow flex items-center gap-1.5 transition">
+              <button id="btn-finish-exam" onclick="confirmAndSubmitExam()" class="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-extrabold px-4 py-2 sm:py-2.5 rounded-xl shadow flex items-center gap-1.5 transition">
                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                 <span>Selesai</span>
               </button>
             </div>
           </div>
 
-          <!-- Layout Ujian Mobile & Desktop Grid -->
           <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-            <!-- Area Lembar Soal -->
             <div class="lg:col-span-3 glass-card p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
               <div class="flex justify-between items-center pb-3 mb-4 border-b border-slate-200">
-                <span class="text-xs font-extrabold bg-slate-900 text-amber-400 px-3 py-1.5 rounded-full">
-                  Soal <span id="current-question-num">1</span>
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-extrabold bg-slate-900 text-amber-400 px-3 py-1.5 rounded-full">
+                    Soal <span id="current-question-num">1</span>
+                  </span>
+                  <span id="answered-progress-pill" class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                    0 Terjawab
+                  </span>
+                </div>
                 <label class="flex items-center space-x-2 text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 cursor-pointer touch-manipulation">
                   <input type="checkbox" id="doubt-checkbox" onchange="toggleDoubtState()" class="rounded text-amber-600 focus:ring-amber-500 w-4 h-4">
                   <span>Ragu-ragu</span>
                 </label>
               </div>
 
-              <!-- Pertanyaan & Opsi Jawaban -->
               <div id="question-container" class="space-y-4 sm:space-y-6">
                 <div id="question-text" class="text-[15px] sm:text-lg font-semibold text-slate-800 leading-relaxed arabic-aware exam-rich-content">
-                  <!-- Text & Gambar Soal Dimuat via JS -->
                 </div>
 
                 <div id="options-container" class="space-y-2.5 sm:space-y-3 pt-1">
-                  <!-- Opsi Jawaban Touch Friendly Dimuat via JS -->
                 </div>
               </div>
 
-              <!-- Tombol Navigasi Soal Bottom -->
               <div class="flex items-center justify-between pt-5 mt-6 border-t border-slate-200 gap-2.5">
                 <button id="btn-prev-question" onclick="navigateQuestion(-1)" class="w-1/2 sm:w-auto bg-slate-200 hover:bg-slate-300 active:scale-[0.98] disabled:opacity-40 text-slate-800 text-xs font-bold py-3.5 px-5 rounded-xl flex items-center justify-center gap-1.5 touch-manipulation transition">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i> Sebelumnya
                 </button>
+                <span class="hidden md:inline text-[11px] text-slate-400 font-medium">Tips: Tekan A/B/C/D untuk menjawab, panah Kiri/Kanan untuk pindah soal</span>
                 <button id="btn-next-question" onclick="navigateQuestion(1)" class="w-1/2 sm:w-auto bg-brand-navy hover:bg-slate-800 active:scale-[0.98] disabled:opacity-40 text-white text-xs font-bold py-3.5 px-5 rounded-xl flex items-center justify-center gap-1.5 touch-manipulation transition">
                   Berikutnya <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
               </div>
             </div>
 
-            <!-- Sidebar Grid Nomor Soal (Desktop / Bottom Sheet Drawer di HP) -->
+            <!-- Sidebar Grid Nomor Soal -->
             <div id="question-grid-sidebar" class="hidden lg:block fixed inset-0 z-50 lg:static lg:z-auto bg-slate-900/60 lg:bg-transparent backdrop-blur-xs lg:backdrop-blur-none flex items-end lg:block">
               <div class="w-full bg-white lg:bg-white/95 rounded-t-3xl lg:rounded-2xl p-5 shadow-2xl lg:shadow-sm border border-slate-200 max-h-[80vh] lg:max-h-none flex flex-col">
                 <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 lg:hidden"></div>
@@ -491,7 +490,6 @@
                 </div>
 
                 <div id="question-grid" class="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-2 overflow-y-auto p-1 custom-scrollbar">
-                  <!-- Dynamic Grid Buttons -->
                 </div>
 
                 <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-3 lg:grid-cols-1 gap-2 text-[11px] text-slate-600 font-medium">
@@ -530,7 +528,6 @@
             </div>
           </div>
 
-          <!-- Overview Cards Grid -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div class="glass-card p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3">
               <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -570,7 +567,6 @@
             </div>
           </div>
 
-          <!-- Tabel Daftar Ujian Terdaftar -->
           <div class="glass-card p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 class="text-sm sm:text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <i data-lucide="list" class="w-4 h-4 text-brand-gold"></i>
@@ -591,7 +587,6 @@
                   </tr>
                 </thead>
                 <tbody id="dashboard-exams-tbody" class="divide-y divide-slate-100">
-                  <!-- JS Injected -->
                 </tbody>
               </table>
             </div>
@@ -613,13 +608,11 @@
                 <div>
                   <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mata Pelajaran</label>
                   <select id="exam-input-subject" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
-                    <!-- Injected via JS -->
                   </select>
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Kelas Target</label>
                   <select id="exam-input-class" required class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-gold font-medium">
-                    <!-- Injected via JS -->
                   </select>
                 </div>
                 <div>
@@ -628,7 +621,6 @@
                 </div>
               </div>
 
-              <!-- Pengaturan Jadwal Ujian & Pengacakan Soal -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 bg-amber-50/70 p-3.5 sm:p-4 rounded-xl border border-amber-200">
                 <div>
                   <label class="block text-xs font-bold text-slate-800 uppercase mb-1 flex items-center gap-1.5">
@@ -657,11 +649,10 @@
                 </div>
               </div>
 
-              <!-- Dropzone File Docx -->
               <div class="border-2 border-dashed border-slate-300 hover:border-brand-gold rounded-2xl p-5 sm:p-7 text-center bg-slate-50/70 transition">
                 <i data-lucide="file-text" class="w-9 h-9 text-slate-400 mx-auto mb-2"></i>
                 <p class="text-xs font-bold text-slate-800 mb-1">Pilih File Microsoft Word (.docx) — Mendukung Gambar, Matematika & Tulisan Arab</p>
-                <p class="text-[11px] text-slate-500 mb-3">Format penulisan berurutan: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code> (atau numbering/bullet Word), <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
+                <p class="text-[11px] text-slate-500 mb-3">Format penulisan berurutan: <code class="bg-slate-200 px-1.5 py-0.5 rounded">1. Pertanyaan</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">A. Opsi</code> s/d <code class="bg-slate-200 px-1.5 py-0.5 rounded">D. Opsi</code>, <code class="bg-slate-200 px-1.5 py-0.5 rounded">Kunci: A</code></p>
                 <input type="file" id="docx-file-input" accept=".docx" class="hidden" onchange="processDocxImport(this)">
                 <button type="button" onclick="document.getElementById('docx-file-input').click()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow">
                   Pilih File Docx
@@ -669,7 +660,6 @@
                 <span id="file-name-display" class="text-xs font-bold text-emerald-600 block mt-2"></span>
               </div>
 
-              <!-- Preview Hasil Parse Soal -->
               <div>
                 <h3 class="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
                   <span>Pratinjau Hasil Parsing Soal</span>
@@ -710,26 +700,21 @@
               </div>
             </div>
 
-            <!-- Filter Kelas & Mapel -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
               <div>
                 <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Filter Kelas</label>
                 <select id="rekap-filter-class" onchange="renderRekapTable()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-medium">
-                  <!-- Injected via JS -->
                 </select>
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Filter Mata Pelajaran</label>
                 <select id="rekap-filter-subject" onchange="renderRekapTable()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-medium">
-                  <!-- Injected via JS -->
                 </select>
               </div>
             </div>
 
-            <!-- Pemantau Status Ujian Siswa (Sudah Ujian vs Belum Ujian) -->
             <div id="student-completion-monitor" class="mb-4 hidden"></div>
 
-            <!-- Tabel Hasil Rekap -->
             <div class="overflow-x-auto -mx-4 sm:mx-0">
               <table class="w-full text-left text-xs text-slate-700 min-w-[640px]">
                 <thead class="bg-slate-100 text-slate-900 uppercase font-bold text-[10px] tracking-wider">
@@ -745,7 +730,6 @@
                   </tr>
                 </thead>
                 <tbody id="rekap-tbody" class="divide-y divide-slate-100">
-                  <!-- JS Injected -->
                 </tbody>
               </table>
             </div>
@@ -803,7 +787,6 @@
                       </tr>
                     </thead>
                     <tbody id="teachers-tbody" class="divide-y divide-slate-100">
-                      <!-- JS Injected -->
                     </tbody>
                   </table>
                 </div>
@@ -819,11 +802,10 @@
                   <div>
                     <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Pilih Kelas Rombel</label>
                     <select id="add-student-class" required onchange="renderUsersManagement()" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-bold">
-                      <!-- JS Injected -->
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Daftar Nama Siswa (Satu nama per baris — bisa copy-paste dari Excel)</label>
+                    <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Daftar Nama Siswa (Satu nama per baris — otomatis menyaring duplikat)</label>
                     <textarea id="add-student-bulk-names" rows="4" required placeholder="Contoh:&#10;Aditya Pratama&#10;Aisyah Putri&#10;Budi Santoso" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs leading-relaxed"></textarea>
                   </div>
                   <button type="submit" id="btn-save-students" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-lg shadow">
@@ -842,7 +824,6 @@
                       </tr>
                     </thead>
                     <tbody id="students-roster-tbody" class="divide-y divide-slate-100">
-                      <!-- JS Injected -->
                     </tbody>
                   </table>
                 </div>
@@ -858,12 +839,12 @@
     <footer class="bg-brand-navy text-slate-400 text-xs py-4 mt-auto border-t border-slate-800">
       <div class="max-w-7xl mx-auto px-4 text-center space-y-1">
         <p class="font-semibold text-slate-300">Asesmen Sumatif Akhir Semester &copy; 2026 SDN 011 Sangatta Selatan</p>
-        <p class="text-[10px] text-slate-500">Sistem CBT Terpadu v3.5 (Pengawas Layar Penuh &amp; Analisis Butir Aktif)</p>
+        <p class="text-[10px] text-slate-500">Sistem CBT Terpadu v3.6 (Auto-Save Aman, Pintasan Keyboard &amp; Analisis Butir Aktif)</p>
       </div>
     </footer>
   </div>
 
-  <!-- ==================== MOBILE FLOATING BOTTOM NAVIGATION (HANYA TAMPIL SAAT STAF LOGIN) ==================== -->
+  <!-- ==================== MOBILE FLOATING BOTTOM NAVIGATION ==================== -->
   <nav id="mobile-bottom-nav" class="hidden md:hidden fixed bottom-2.5 left-3 right-3 bg-brand-navy/95 backdrop-blur-md text-slate-300 rounded-2xl shadow-2xl z-40 border border-slate-700 px-2 py-2 pb-safe">
     <div class="flex justify-around items-center text-[10px] font-semibold">
       <button onclick="switchView('home-view')" data-nav="home-view" class="mobile-nav-item flex flex-col items-center gap-1 text-amber-400 px-2 py-1">
@@ -889,7 +870,7 @@
     </div>
   </nav>
 
-  <!-- ==================== MODAL PORTAL LOGIN (HYBRID AUTH) ==================== -->
+  <!-- ==================== MODAL PORTAL LOGIN ==================== -->
   <div id="login-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
       <button onclick="closeLoginModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
@@ -907,7 +888,6 @@
         <p class="text-xs text-slate-500">Pilih peran akses untuk masuk ke sistem pengelolaan ujian</p>
       </div>
 
-      <!-- Tab Pilihan Peran Login -->
       <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl mb-4 border border-slate-200">
         <button type="button" id="tab-role-guru" onclick="switchLoginRoleTab('guru')" class="py-2 rounded-lg text-xs font-extrabold bg-white text-slate-900 shadow-sm transition">
           Guru Kelas
@@ -983,7 +963,7 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL ATUR JADWAL UJIAN (GURU / ADMIN) ==================== -->
+  <!-- ==================== MODAL ATUR JADWAL UJIAN ==================== -->
   <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-card rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
       <button onclick="closeScheduleModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
@@ -1047,7 +1027,6 @@
       </div>
 
       <div id="edit-questions-list" class="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 flex-grow">
-        <!-- Injected via JS -->
       </div>
 
       <div class="p-4 bg-slate-100 border-t border-slate-200 flex justify-end gap-2 shrink-0">
@@ -1060,7 +1039,6 @@
   <!-- ==================== MODAL REKAP ANALISIS JAWABAN BUTIR SOAL ==================== -->
   <div id="analysis-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6">
     <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden relative">
-      <!-- Modal Header -->
       <div class="p-4 sm:p-6 bg-brand-navy text-white flex items-center justify-between border-b border-slate-700 shrink-0">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
@@ -1076,28 +1054,22 @@
         </button>
       </div>
 
-      <!-- Controls & Filter Paket Ujian -->
       <div class="no-print p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div class="flex-1 max-w-md">
           <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Pilih Paket Ujian SAS</label>
           <select id="analysis-select-exam" onchange="renderAnalysisMatrix()" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-gold">
-            <!-- Injected via JS -->
           </select>
         </div>
 
         <div id="analysis-summary-badge" class="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 font-medium">
-          <!-- Summary Stat Injected -->
         </div>
       </div>
 
-      <!-- Matrix Body Table -->
       <div class="p-4 sm:p-6 overflow-auto custom-scrollbar flex-grow">
         <div id="analysis-matrix-container" class="min-w-[650px]">
-          <!-- Table Matrix & Signature Injected via JS -->
         </div>
       </div>
 
-      <!-- Legend & Footer -->
       <div class="no-print p-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold shrink-0">
         <div class="flex items-center gap-4 text-[11px]">
           <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold">A</span> Benar</span>
@@ -1122,6 +1094,7 @@
   <script>
     let parsedDocxQuestions = [];
     let lastViolationTimestamp = 0;
+    let isSubmittingExam = false;
 
     window.safeCreateIcons = function() {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1141,6 +1114,31 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     }
+
+    // Monitor status jaringan Online / Offline
+    function updateNetworkBadge() {
+      const pill = document.getElementById('connection-status-pill');
+      const txt = document.getElementById('connection-status-text');
+      if (!pill || !txt) return;
+      pill.classList.remove('hidden');
+      if (navigator.onLine) {
+        pill.className = 'hidden sm:flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700 text-[10px] font-bold text-emerald-400';
+        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>Online</span>';
+      } else {
+        pill.className = 'hidden sm:flex items-center gap-1.5 bg-rose-950/90 px-2.5 py-1.5 rounded-xl border border-rose-700 text-[10px] font-bold text-rose-300';
+        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Offline (Tersimpan Lokal)</span>';
+      }
+    }
+    window.addEventListener('online', updateNetworkBadge);
+    window.addEventListener('offline', updateNetworkBadge);
+
+    window.safeNavigateHome = function() {
+      if (window.SAS_APP && window.SAS_APP.activeExam) {
+        showNotify('Ujian Sedang Berlangsung', 'Selesaikan atau kumpulkan ujian terlebih dahulu sebelum kembali ke beranda.', true);
+        return;
+      }
+      switchView('home-view');
+    };
 
     window.showNotify = function(title, message, isError = false) {
       const modal = document.getElementById('custom-dialog-modal');
@@ -1193,6 +1191,11 @@
     };
 
     // ==================== PENGAWAS FULLSCREEN & DETEKSI PINDAH TAB ====================
+    function isFullscreenSupported() {
+      const elem = document.documentElement;
+      return !!(elem.requestFullscreen || elem.webkitRequestFullscreen);
+    }
+
     window.enterExamFullscreen = async function() {
       try {
         const elem = document.documentElement;
@@ -1204,7 +1207,7 @@
           }
         }
       } catch (e) {
-        console.warn('Browser membatasi fullscreen otomatis:', e);
+        console.warn('Perangkat/browser tidak mendukung fullscreen otomatis:', e);
       }
     };
 
@@ -1259,9 +1262,9 @@
     };
 
     function registerTabSwitchViolation(reason) {
-      if (!window.SAS_APP || !window.SAS_APP.activeExam) return;
+      if (!window.SAS_APP || !window.SAS_APP.activeExam || isSubmittingExam) return;
       const now = Date.now();
-      if (now - lastViolationTimestamp < 1800) return;
+      if (now - lastViolationTimestamp < 2000) return;
       lastViolationTimestamp = now;
 
       window.SAS_APP.tabViolations = (window.SAS_APP.tabViolations || 0) + 1;
@@ -1300,13 +1303,31 @@
 
     document.addEventListener('fullscreenchange', () => {
       const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      if (!isFs && window.SAS_APP && window.SAS_APP.activeExam) {
+      if (!isFs && isFullscreenSupported() && window.SAS_APP && window.SAS_APP.activeExam && !isSubmittingExam) {
         showSecurityOverlay(
           'Mode Layar Penuh Terkeluar',
           'Lembar soal dikunci sementara karena Anda keluar dari tampilan layar penuh. Tekan tombol di bawah untuk kembali melanjutkan ujian.',
           `PELANGGARAN TERCATAT: ${window.SAS_APP.tabViolations || 0} / ${window.SAS_APP.maxTabViolations || 3}`,
           false
         );
+      }
+    });
+
+    // Pintasan Keyboard saat Ujian Berlangsung
+    document.addEventListener('keydown', (e) => {
+      if (!window.SAS_APP || !window.SAS_APP.activeExam || isSubmittingExam) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+      const key = e.key.toUpperCase();
+      if (['A', 'B', 'C', 'D'].includes(key)) {
+        e.preventDefault();
+        window.selectOption(key);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        window.navigateQuestion(1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        window.navigateQuestion(-1);
       }
     });
 
@@ -1686,6 +1707,7 @@
         return;
       }
 
+      isSubmittingExam = false;
       await window.enterExamFullscreen();
 
       window.SAS_APP.activeExam = exam;
@@ -1791,6 +1813,12 @@
       const question = exam.questions[masterIdx];
 
       document.getElementById('current-question-num').innerText = `${displayIdx + 1} / ${exam.questions.length}`;
+      const answeredTotal = Object.keys(window.SAS_APP.examAnswers || {}).length;
+      const progressPill = document.getElementById('answered-progress-pill');
+      if (progressPill) {
+        progressPill.innerText = `${answeredTotal}/${exam.questions.length} Terjawab`;
+      }
+
       const qImgHtml = question.image ? `<img src="${question.image}" alt="Gambar Soal ${displayIdx + 1}" class="mt-2.5 max-h-64 rounded-xl border border-slate-200 bg-white object-contain">` : '';
       document.getElementById('question-text').innerHTML = `<div class="arabic-aware">${displayIdx + 1}. ${formatArabicTextHtml(question.question)}</div>${qImgHtml}`;
 
@@ -1879,11 +1907,35 @@
       }).join('');
     }
 
-    window.submitExam = async function(isAutoTimeout = false, forcedReason = '') {
-      clearInterval(window.SAS_APP.examTimer);
-
+    window.confirmAndSubmitExam = function() {
       const exam = window.SAS_APP.activeExam;
       if (!exam) return;
+      const total = exam.questions.length;
+      const answered = Object.keys(window.SAS_APP.examAnswers || {}).length;
+      const unanswered = total - answered;
+
+      const warnText = unanswered > 0
+        ? `Masih ada ${unanswered} soal yang BELUM dijawab!\n\nApakah Anda tetap yakin ingin mengumpulkan ujian sekarang?`
+        : 'Seluruh soal sudah dijawab. Lembar jawaban yang sudah dikumpulkan tidak dapat diubah kembali.';
+
+      openConfirmModal('Kumpulkan Ujian?', warnText, () => submitExam());
+    };
+
+    window.submitExam = async function(isAutoTimeout = false, forcedReason = '') {
+      if (isSubmittingExam) return;
+      const exam = window.SAS_APP.activeExam;
+      if (!exam) return;
+
+      isSubmittingExam = true;
+      clearInterval(window.SAS_APP.examTimer);
+
+      const finishBtn = document.getElementById('btn-finish-exam');
+      const originalBtnHtml = finishBtn ? finishBtn.innerHTML : '';
+      if (finishBtn) {
+        finishBtn.disabled = true;
+        finishBtn.innerHTML = '<span>Mengirim...</span>';
+      }
+
       const answers = { ...window.SAS_APP.examAnswers };
       let correctCount = 0;
 
@@ -1931,7 +1983,14 @@
         switchView('home-view');
         loadAvailableExamsForStudent();
       } catch (err) {
-        showNotify('Gagal Mengirim Jawaban', err.message, true);
+        window.saveCurrentExamProgress();
+        showNotify('Gagal Mengirim Jawaban', `Koneksi terganggu (${err.message}). Jawaban Anda tetap aman tersimpan di perangkat. Silakan tekan "Selesai" kembali saat jaringan stabil.`, true);
+      } finally {
+        isSubmittingExam = false;
+        if (finishBtn) {
+          finishBtn.disabled = false;
+          finishBtn.innerHTML = originalBtnHtml;
+        }
       }
     };
 
@@ -2367,7 +2426,6 @@
         parsedDocxQuestions.push(currentQ);
       }
 
-      // Tangkap kunci jawaban apabila ditulis terpisah di bagian akhir dokumen (misal: "1. B  2. C  3. D" atau tabel kunci)
       const trailingKeyMap = {};
       blocks.forEach(block => {
         const txt = normalizeDigits(block.text || '').trim();
@@ -3567,10 +3625,10 @@
       btn.innerText = 'Menyimpan Roster...';
 
       try {
-        await window.DB_SERVICE.saveClassRoster(cls, namesList);
+        const addedCount = await window.DB_SERVICE.saveClassRoster(cls, namesList);
         document.getElementById('add-student-bulk-names').value = '';
         renderUsersManagement();
-        showNotify('Roster Disimpan', `${namesList.length} siswa berhasil ditambahkan ke Kelas ${cls}.`);
+        showNotify('Roster Disimpan', `${addedCount} siswa baru berhasil ditambahkan ke Kelas ${cls}.`);
       } catch (err) {
         showNotify('Gagal Menyimpan Roster', err.message, true);
       } finally {
@@ -3586,7 +3644,7 @@
     };
 
     window.addEventListener('beforeunload', function(e) {
-      if (window.SAS_APP && window.SAS_APP.activeExam) {
+      if (window.SAS_APP && window.SAS_APP.activeExam && !isSubmittingExam) {
         window.saveCurrentExamProgress();
         e.preventDefault();
         e.returnValue = '';
@@ -3931,18 +3989,27 @@
       },
 
       async saveClassRoster(className, studentNamesArray) {
-        const cleanList = studentNamesArray
-          .map((name, idx) => ({
-            id: `stu_${className}_${Date.now()}_${idx}`,
-            name: name.trim()
-          }))
-          .filter(item => item.name.length > 0);
-
         await window.fetchClassRosterFromFirestore(className);
         const existing = window.SAS_APP.data.students
           .filter(s => s.class === className)
           .map(s => ({ id: s.id, name: s.name }));
-        const merged = [...existing, ...cleanList];
+
+        const existingNormalized = new Set(existing.map(s => s.name.trim().toLowerCase()));
+        const uniqueNewStudents = [];
+
+        studentNamesArray.forEach((rawName, idx) => {
+          const cleanName = rawName.trim();
+          const norm = cleanName.toLowerCase();
+          if (cleanName.length > 0 && !existingNormalized.has(norm)) {
+            existingNormalized.add(norm);
+            uniqueNewStudents.push({
+              id: `stu_${className}_${Date.now()}_${idx}`,
+              name: cleanName
+            });
+          }
+        });
+
+        const merged = [...existing, ...uniqueNewStudents];
         
         await setDoc(getPublicDocRef('rosters', className), {
           class: className,
@@ -3954,6 +4021,8 @@
           ...window.SAS_APP.data.students.filter(s => s.class !== className),
           ...merged.map(m => ({ id: m.id, name: m.name, class: className }))
         ];
+
+        return uniqueNewStudents.length;
       },
 
       async deleteStudent(studentId, className) {
@@ -3982,6 +4051,7 @@
     };
 
     window.addEventListener('DOMContentLoaded', async () => {
+      updateNetworkBadge();
       if (typeof window.safeCreateIcons === 'function') window.safeCreateIcons();
       await initProductionFirebase();
       if (typeof window.populateClassDropdowns === 'function') window.populateClassDropdowns();

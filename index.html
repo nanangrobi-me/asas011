@@ -265,6 +265,9 @@
             <i data-lucide="user-check" class="w-3.5 h-3.5 text-amber-400"></i>
             <span id="badge-user-name" class="font-semibold text-slate-200 max-w-[140px] truncate">Guest</span>
             <span id="badge-user-role" class="text-[9px] bg-brand-gold text-slate-950 px-1.5 py-0.5 rounded font-extrabold uppercase">Siswa</span>
+            <span id="live-sync-indicator" class="hidden items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded font-bold" title="Pembaruan nilai real-time aktif">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE
+            </span>
           </div>
 
           <button id="btn-login-modal" onclick="openLoginModal()" class="flex items-center space-x-1.5 bg-brand-gold hover:bg-brand-goldHover active:scale-95 text-slate-950 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-extrabold transition shadow">
@@ -1501,8 +1504,15 @@
       nameSelect.disabled = true;
       nameSelect.innerHTML = '<option value="">Memuat daftar siswa...</option>';
 
-      if (!window.SAS_APP.IS_PREVIEW && typeof window.fetchClassRosterFromFirestore === 'function') {
-        await window.fetchClassRosterFromFirestore(selectedClass);
+      if (!window.SAS_APP.IS_PREVIEW) {
+        const tasks = [];
+        if (typeof window.fetchClassRosterFromFirestore === 'function') {
+          tasks.push(window.fetchClassRosterFromFirestore(selectedClass));
+        }
+        if (typeof window.fetchClassExamsFromFirestore === 'function') {
+          tasks.push(window.fetchClassExamsFromFirestore(selectedClass));
+        }
+        await Promise.all(tasks);
       }
 
       const filteredStudents = window.SAS_APP.data.students.filter(s => s.class === selectedClass);
@@ -1619,6 +1629,10 @@
 
       const examListContainer = document.getElementById('student-exam-list');
       examListContainer.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">Memeriksa daftar asesmen aktif...</div>`;
+
+      if (!window.SAS_APP.IS_PREVIEW && typeof window.fetchClassExamsFromFirestore === 'function') {
+        await window.fetchClassExamsFromFirestore(selectedClass);
+      }
 
       const exams = window.SAS_APP.data.exams.filter(e => e.targetClass === selectedClass && e.status === 'aktif');
       document.getElementById('active-exam-count').innerText = `${exams.length} Ujian`;
@@ -2730,6 +2744,9 @@
 
       updateNavigationVisibility();
       populateClassDropdowns();
+      if (typeof window.startRealtimeStaffListeners === 'function') {
+        window.startRealtimeStaffListeners();
+      }
     };
 
     window.handleLogout = async function() {
@@ -2739,9 +2756,14 @@
       window.SAS_APP.examDoubts = {};
       window.SAS_APP.tabViolations = 0;
 
+      if (typeof window.stopRealtimeStaffListeners === 'function') {
+        window.stopRealtimeStaffListeners();
+      }
+
       await window.DB_SERVICE.logoutUser();
       window.SAS_APP.currentUser = null;
       document.getElementById('user-profile-badge').classList.add('hidden');
+      document.getElementById('live-sync-indicator')?.classList.add('hidden');
       document.getElementById('btn-login-modal').classList.remove('hidden');
       document.getElementById('btn-logout').classList.add('hidden');
       updateNavigationVisibility();
@@ -3406,6 +3428,21 @@
               border-radius: 4px;
               font-weight: bold;
             }
+            .bg-sky-100 {
+              background-color: #E0F2FE !important;
+              color: #0369A1 !important;
+              font-weight: bold;
+            }
+            .bg-emerald-100 {
+              background-color: #D1FAE5 !important;
+              color: #065F46 !important;
+              font-weight: bold;
+            }
+            .bg-rose-100 {
+              background-color: #FFE4E6 !important;
+              color: #9F1239 !important;
+              font-weight: bold;
+            }
             .signature-block {
               margin-top: 24px;
               display: flex;
@@ -3465,8 +3502,22 @@
       const teacherName = teacherObj ? teacherObj.name : '.......................................';
       const targetStudents = window.SAS_APP.data.students.filter(s => s.class === exam.targetClass);
       const examResults = findMatchingResultsForExam(exam);
+
+      const displayList = [...targetStudents];
+      examResults.forEach(r => {
+        const existsInRoster = displayList.some(s =>
+          (r.studentId && s.id === r.studentId) ||
+          normalizeIdentityStr(s.name) === normalizeIdentityStr(r.studentName)
+        );
+        if (!existsInRoster && r.studentName) {
+          displayList.push({ id: r.studentId || '', name: r.studentName, class: exam.targetClass });
+        }
+      });
+
       const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
       const totalCols = exam.questions.length + 3;
+      const itemCorrectCounts = new Array(exam.questions.length).fill(0);
+      let submittedParticipantsCount = 0;
 
       let excelHTML = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -3482,6 +3533,10 @@
             .salah { background-color: #FFE4E6; color: #9F1239; font-weight: bold; }
             .kosong { background-color: #F1F5F9; color: #64748B; }
             .skor { background-color: #FEF3C7; font-weight: bold; }
+            .stat-row { background-color: #F8FAFC; font-weight: bold; }
+            .mudah { background-color: #D1FAE5; color: #065F46; font-weight: bold; }
+            .sedang { background-color: #E0F2FE; color: #0369A1; font-weight: bold; }
+            .sukar { background-color: #FFE4E6; color: #9F1239; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -3501,15 +3556,18 @@
             <tbody>
       `;
 
-      targetStudents.forEach((student, idx) => {
+      displayList.forEach((student, idx) => {
         const res = findStudentResultInList(student, examResults);
         excelHTML += `<tr><td>${idx + 1}</td><td class="left">${student.name}</td>`;
         if (res) {
+          submittedParticipantsCount++;
           excelHTML += `<td class="skor">${res.score}</td>`;
           exam.questions.forEach((q, qIdx) => {
             const rawAns = res.studentAnswers ? (res.studentAnswers[qIdx] ?? res.studentAnswers[String(qIdx)]) : null;
             const ans = rawAns || '-';
-            const cls = ans === '-' ? 'kosong' : (ans === q.answer ? 'benar' : 'salah');
+            const isCorrect = ans === q.answer;
+            if (isCorrect) itemCorrectCounts[qIdx]++;
+            const cls = ans === '-' ? 'kosong' : (isCorrect ? 'benar' : 'salah');
             excelHTML += `<td class="${cls}">${ans}</td>`;
           });
         } else {
@@ -3518,7 +3576,35 @@
         excelHTML += `</tr>`;
       });
 
+      const avgTotalScore = submittedParticipantsCount > 0
+        ? Math.round(examResults.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / examResults.length)
+        : 0;
+
       excelHTML += `
+              <tr class="stat-row">
+                <td colspan="2" class="left">JUMLAH BENAR PER SOAL</td>
+                <td class="skor">Rata: ${avgTotalScore}</td>
+                ${itemCorrectCounts.map(cnt => `<td>${cnt}/${submittedParticipantsCount}</td>`).join('')}
+              </tr>
+              <tr class="stat-row">
+                <td colspan="2" class="left">KETUNTASAN BUTIR (%)</td>
+                <td>-</td>
+                ${itemCorrectCounts.map(cnt => {
+                  const pct = submittedParticipantsCount > 0 ? Math.round((cnt / submittedParticipantsCount) * 100) : 0;
+                  return `<td>${pct}%</td>`;
+                }).join('')}
+              </tr>
+              <tr class="stat-row">
+                <td colspan="2" class="left">TINGKAT KESUKARAN</td>
+                <td>-</td>
+                ${itemCorrectCounts.map(cnt => {
+                  if (submittedParticipantsCount === 0) return `<td class="kosong">-</td>`;
+                  const pct = (cnt / submittedParticipantsCount) * 100;
+                  if (pct >= 70) return `<td class="mudah">Mudah</td>`;
+                  if (pct >= 30) return `<td class="sedang">Sedang</td>`;
+                  return `<td class="sukar">Sukar</td>`;
+                }).join('')}
+              </tr>
             </tbody>
             <tfoot>
               <tr><td colspan="${totalCols}" style="border:none;"></td></tr>
@@ -3571,6 +3657,9 @@
         }
       });
 
+      const itemCorrectCounts = new Array(exam.questions.length).fill(0);
+      let submittedCount = 0;
+
       summaryBadge.innerHTML = `
         <span>Total Siswa Rombel: <b>${displayList.length}</b></span> |
         <span>Sudah Ujian: <b class="text-emerald-600">${examResults.length}</b></span>
@@ -3614,6 +3703,7 @@
           `;
 
           if (studentResult) {
+            submittedCount++;
             tableHTML += `
               <td class="p-1 border border-slate-200 text-center">
                 <span class="bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded text-[10px] print-exact">${studentResult.score}</span>
@@ -3626,6 +3716,7 @@
                 : null;
               const ans = savedAns || '-';
               const isCorrect = ans === q.answer;
+              if (isCorrect) itemCorrectCounts[qIdx]++;
 
               tableHTML += `
                 <td class="p-0.5 border border-slate-200 text-center font-bold">
@@ -3650,7 +3741,48 @@
         });
       }
 
-      tableHTML += `</tbody></table>`;
+      const avgClassScore = submittedCount > 0
+        ? Math.round(examResults.reduce((acc, r) => acc + (Number(r.score) || 0), 0) / examResults.length)
+        : 0;
+
+      tableHTML += `
+          </tbody>
+          <tfoot class="bg-slate-100 text-[10px] font-extrabold text-slate-800 border-t-2 border-slate-400">
+            <tr>
+              <td colspan="2" class="p-1.5 border border-slate-300 text-left uppercase">Jumlah Benar</td>
+              <td class="p-1 border border-slate-300 text-center bg-amber-100 text-amber-950 print-exact" title="Rata-rata Skor Kelas">Ø ${avgClassScore}</td>
+              ${itemCorrectCounts.map(cnt => `
+                <td class="p-1 border border-slate-300 text-center text-slate-700">${cnt}/${submittedCount}</td>
+              `).join('')}
+            </tr>
+            <tr>
+              <td colspan="2" class="p-1.5 border border-slate-300 text-left uppercase">Ketuntasan (%)</td>
+              <td class="p-1 border border-slate-300 text-center text-slate-400">-</td>
+              ${itemCorrectCounts.map(cnt => {
+                const pct = submittedCount > 0 ? Math.round((cnt / submittedCount) * 100) : 0;
+                return `<td class="p-1 border border-slate-300 text-center">${pct}%</td>`;
+              }).join('')}
+            </tr>
+            <tr>
+              <td colspan="2" class="p-1.5 border border-slate-300 text-left uppercase">Tingkat Kesukaran</td>
+              <td class="p-1 border border-slate-300 text-center text-slate-400">-</td>
+              ${itemCorrectCounts.map(cnt => {
+                if (submittedCount === 0) {
+                  return `<td class="p-1 border border-slate-300 text-center text-slate-400">-</td>`;
+                }
+                const pct = (cnt / submittedCount) * 100;
+                if (pct >= 70) {
+                  return `<td class="p-1 border border-slate-300 text-center bg-emerald-100 text-emerald-800 print-exact" title="Mudah (>= 70% benar)">Mudah</td>`;
+                }
+                if (pct >= 30) {
+                  return `<td class="p-1 border border-slate-300 text-center bg-sky-100 text-sky-800 print-exact" title="Sedang (30% - 69% benar)">Sedang</td>`;
+                }
+                return `<td class="p-1 border border-slate-300 text-center bg-rose-100 text-rose-800 print-exact" title="Sukar (< 30% benar) — Perlu Remedial/Evaluasi Soal">Sukar</td>`;
+              }).join('')}
+            </tr>
+          </tfoot>
+        </table>
+      `;
 
       tableHTML += `
         <div class="signature-block mt-6 flex justify-end text-xs text-slate-800 font-medium">
@@ -3809,7 +3941,10 @@
       updateDoc, 
       deleteDoc, 
       collection, 
-      getDocs 
+      getDocs,
+      query,
+      where,
+      onSnapshot
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     if ('serviceWorker' in navigator) {
@@ -3856,7 +3991,9 @@
         students: [],
         exams: [],
         results: []
-      }
+      },
+
+      unsubscribes: []
     };
 
     function getPublicCollectionRef(colName) {
@@ -3934,30 +4071,74 @@
       }
     };
 
+    // Optimasi Kuota Firestore: Siswa hanya memuat paket ujian untuk kelasnya sendiri
+    window.fetchClassExamsFromFirestore = async function(className) {
+      if (IS_PREVIEW || !window.SAS_APP.db || !className) return;
+      try {
+        await ensureAuthenticatedSession();
+        const qExams = query(
+          getPublicCollectionRef('exams'),
+          where('targetClass', '==', className)
+        );
+        const snap = await getDocs(qExams);
+        const classExams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        window.SAS_APP.data.exams = [
+          ...window.SAS_APP.data.exams.filter(e => e.targetClass !== className),
+          ...classExams
+        ];
+      } catch (err) {
+        console.error(`Gagal mengambil soal ujian kelas ${className}:`, err);
+      }
+    };
+
     window.syncInitialPublicData = async function() {
       if (IS_PREVIEW || !window.SAS_APP.db) return;
       try {
         await ensureAuthenticatedSession();
-        const [rostersSnap, examsSnap] = await Promise.all([
-          getDocs(getPublicCollectionRef('rosters')),
-          getDocs(getPublicCollectionRef('exams'))
-        ]);
 
-        let allStudents = [];
-        rostersSnap.forEach(docSnap => {
-          const d = docSnap.data();
-          if (Array.isArray(d.list)) {
-            d.list.forEach(stu => {
-              allStudents.push({ id: stu.id, name: stu.name, class: docSnap.id });
-            });
+        // Jika pengguna adalah siswa (belum login staf), tunda pemuatan berat seluruh soal/roster
+        // Data akan dimuat secara hemat kuota per kelas saat siswa memilih kelasnya
+        if (!window.SAS_APP.currentUser) {
+          const selectedClass = document.getElementById('student-select-class')?.value;
+          if (selectedClass) {
+            await Promise.all([
+              window.fetchClassRosterFromFirestore(selectedClass),
+              window.fetchClassExamsFromFirestore(selectedClass)
+            ]);
           }
-        });
-        window.SAS_APP.data.students = allStudents;
-        window.SAS_APP.data.exams = examsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          refreshCurrentActiveView();
+          return;
+        }
 
-        if (window.SAS_APP.currentUser) {
+        // Jika staf (Guru / Admin) sudah login, muat data sesuai hak akses kelasnya
+        const isTeacherOnly = window.SAS_APP.currentUser.role === 'guru' && window.SAS_APP.currentUser.class;
+        if (isTeacherOnly) {
+          const cls = window.SAS_APP.currentUser.class;
+          await Promise.all([
+            window.fetchClassRosterFromFirestore(cls),
+            window.fetchClassExamsFromFirestore(cls),
+            window.syncStaffData()
+          ]);
+        } else {
+          const [rostersSnap, examsSnap] = await Promise.all([
+            getDocs(getPublicCollectionRef('rosters')),
+            getDocs(getPublicCollectionRef('exams'))
+          ]);
+
+          let allStudents = [];
+          rostersSnap.forEach(docSnap => {
+            const d = docSnap.data();
+            if (Array.isArray(d.list)) {
+              d.list.forEach(stu => {
+                allStudents.push({ id: stu.id, name: stu.name, class: docSnap.id });
+              });
+            }
+          });
+          window.SAS_APP.data.students = allStudents;
+          window.SAS_APP.data.exams = examsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           await window.syncStaffData();
         }
+
         refreshCurrentActiveView();
       } catch (err) {
         console.error("Gagal sinkronisasi awal:", err);
@@ -3968,7 +4149,12 @@
       if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
       try {
         await ensureAuthenticatedSession();
-        const tasks = [getDocs(getPublicCollectionRef('results'))];
+        const isTeacherOnly = window.SAS_APP.currentUser.role === 'guru' && window.SAS_APP.currentUser.class;
+        const resultsQuery = isTeacherOnly
+          ? query(getPublicCollectionRef('results'), where('studentClass', '==', window.SAS_APP.currentUser.class))
+          : getPublicCollectionRef('results');
+
+        const tasks = [getDocs(resultsQuery)];
         if (window.SAS_APP.currentUser.role === 'admin') {
           tasks.push(getDocs(getPublicCollectionRef('teachers')));
         }
@@ -3979,6 +4165,53 @@
         }
       } catch (err) {
         console.error("Gagal memuat data staf:", err);
+      }
+    };
+
+    // Real-Time Live Monitoring untuk Dashboard, Rekap Nilai & Analisis Butir Guru/Admin
+    window.startRealtimeStaffListeners = async function() {
+      if (IS_PREVIEW || !window.SAS_APP.db || !window.SAS_APP.currentUser) return;
+      window.stopRealtimeStaffListeners();
+
+      try {
+        await ensureAuthenticatedSession();
+        const user = window.SAS_APP.currentUser;
+        const isTeacherOnly = user.role === 'guru' && user.class;
+
+        const resultsQuery = isTeacherOnly
+          ? query(getPublicCollectionRef('results'), where('studentClass', '==', user.class))
+          : getPublicCollectionRef('results');
+
+        const unsubResults = onSnapshot(resultsQuery, (snapshot) => {
+          window.SAS_APP.data.results = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const liveBadge = document.getElementById('live-sync-indicator');
+          if (liveBadge) {
+            liveBadge.classList.remove('hidden');
+            liveBadge.classList.add('inline-flex');
+          }
+          refreshCurrentActiveView();
+
+          // Jika modal analisis butir sedang terbuka, perbarui matriksnya secara live
+          const analysisModal = document.getElementById('analysis-modal');
+          if (analysisModal && !analysisModal.classList.contains('hidden') && typeof window.renderAnalysisMatrix === 'function') {
+            window.renderAnalysisMatrix();
+          }
+        }, (err) => {
+          console.warn('Listener real-time results berhenti:', err);
+        });
+
+        window.SAS_APP.unsubscribes.push(unsubResults);
+      } catch (err) {
+        console.warn('Gagal mengaktifkan pemantauan real-time:', err);
+      }
+    };
+
+    window.stopRealtimeStaffListeners = function() {
+      if (Array.isArray(window.SAS_APP.unsubscribes)) {
+        window.SAS_APP.unsubscribes.forEach(unsub => {
+          try { if (typeof unsub === 'function') unsub(); } catch (e) {}
+        });
+        window.SAS_APP.unsubscribes = [];
       }
     };
 
